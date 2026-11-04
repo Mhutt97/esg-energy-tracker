@@ -3,18 +3,14 @@ import {
   Leaf,
   LayoutDashboard,
   Receipt,
-  FileSpreadsheet,
   Cloud,
   Plus,
-  RotateCcw,
   Github,
 } from 'lucide-react';
 import DashboardView from './components/DashboardView.jsx';
 import InvoiceTable from './components/InvoiceTable.jsx';
-import EsgReportView from './components/EsgReportView.jsx';
 import InvoiceModal from './components/InvoiceModal.jsx';
 import BackendConfigModal from './components/BackendConfigModal.jsx';
-import { INITIAL_SAMPLE_INVOICES } from './data/emissionFactors.js';
 import {
   loadLocalState,
   saveLocalInvoices,
@@ -34,7 +30,7 @@ export default function App() {
   );
 
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedFacility, setSelectedFacility] = useState('All Facilities');
+  const [selectedSite, setSelectedSite] = useState('All Sites');
   const [selectedYear, setSelectedYear] = useState('All Years');
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -96,7 +92,7 @@ export default function App() {
       showToast(`Updated invoice ${invoiceRecord.invoiceNumber}`);
     } else {
       nextInvoices = [invoiceRecord, ...invoices];
-      showToast(`Added invoice ${invoiceRecord.invoiceNumber} to ESG ledger`);
+      showToast(`Added invoice ${invoiceRecord.invoiceNumber}`);
     }
     setInvoices(nextInvoices);
     setIsInvoiceModalOpen(false);
@@ -129,16 +125,6 @@ export default function App() {
     triggerAutoSyncIfEnabled(nextInvoices, orgProfile);
   };
 
-  const handleResetDemoData = () => {
-    setInvoices(INITIAL_SAMPLE_INVOICES);
-    showToast('Restored sample FY2026 ESG invoice dataset');
-  };
-
-  const existingFacilities = useMemo(() => {
-    const set = new Set(invoices.map((i) => i.facility).filter(Boolean));
-    return Array.from(set);
-  }, [invoices]);
-
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Top Navigation Header */}
@@ -155,11 +141,11 @@ export default function App() {
                   EcoLedger ESG
                 </span>
                 <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Scope 1 · 2 · Water
+                  UK Energy Tracker (£ GBP)
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Business Utility Invoice & GHG Disclosure Tracker
+                Business Utility Invoice & ESG Emissions Tracker
               </p>
             </div>
           </div>
@@ -176,11 +162,6 @@ export default function App() {
                 id: 'invoices',
                 label: `Utility Invoices (${invoices.length})`,
                 icon: Receipt,
-              },
-              {
-                id: 'esg-report',
-                label: 'GRI / CSRD Disclosure',
-                icon: FileSpreadsheet,
               },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -234,7 +215,7 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition"
             >
               <Plus className="w-4 h-4" />
-              New Invoice
+              Log Utility Invoice
             </button>
           </div>
         </div>
@@ -261,16 +242,14 @@ export default function App() {
           <DashboardView
             invoices={invoices}
             orgProfile={orgProfile}
-            onUpdateOrgProfile={setOrgProfile}
-            selectedFacility={selectedFacility}
-            onSelectFacility={setSelectedFacility}
+            selectedSite={selectedSite}
+            onSelectSite={setSelectedSite}
             selectedYear={selectedYear}
             onSelectYear={setSelectedYear}
             onOpenNewInvoice={() => {
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
-            onSwitchTab={setActiveTab}
           />
         )}
 
@@ -290,32 +269,15 @@ export default function App() {
             onBulkImport={handleBulkImport}
           />
         )}
-
-        {activeTab === 'esg-report' && (
-          <EsgReportView
-            invoices={invoices}
-            orgProfile={orgProfile}
-            onUpdateOrgProfile={setOrgProfile}
-          />
-        )}
       </main>
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div>
-            <strong>EcoLedger ESG</strong> · Built for static hosting on GitHub
-            Pages with GitHub REST API & Google Sheets persistence.
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleResetDemoData}
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset Sample Dataset
-            </button>
+            <strong>EcoLedger ESG</strong> · UK Business Utility & Emissions
+            Tracker (Head Office London · Office Sheffield · Office Leeds ·
+            Office Bristol)
           </div>
         </div>
       </footer>
@@ -329,7 +291,6 @@ export default function App() {
         }}
         onSave={handleSaveInvoice}
         editingInvoice={editingInvoice}
-        existingFacilities={existingFacilities}
       />
 
       <BackendConfigModal

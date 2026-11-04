@@ -3,11 +3,13 @@ import {
   DEFAULT_ORG_PROFILE,
   calculateInvoiceEsgMetrics,
   UTILITY_CATEGORIES,
+  SITES,
+  SUPPLIERS,
 } from '../data/emissionFactors.js';
 
 const STORAGE_KEYS = {
-  INVOICES: 'esg_tracker_invoices_v1',
-  ORG_PROFILE: 'esg_tracker_org_profile_v1',
+  INVOICES: 'esg_tracker_invoices_uk_v2',
+  ORG_PROFILE: 'esg_tracker_org_profile_uk_v2',
   BACKEND_CONFIG: 'esg_tracker_backend_config_v1',
 };
 
@@ -129,7 +131,7 @@ export async function pullFromGitHub(ghConfig) {
 
   if (res.status === 404) {
     throw new Error(
-      `File "${cleanPath}" not found on branch "${branch}". Click "Push / Commit to GitHub" first to initialize it.`
+      `File "${cleanPath}" not found on branch "${branch}". Click "Commit & Push Invoices to GitHub" first to initialize it.`
     );
   }
 
@@ -174,7 +176,6 @@ export async function pushToGitHub(ghConfig, payload) {
     'X-GitHub-Api-Version': '2022-11-28',
   };
 
-  // Step 1: Check if file already exists to retrieve its SHA
   let existingSha = null;
   const getRes = await fetch(
     `${baseUrl}?ref=${encodeURIComponent(branch.trim())}`,
@@ -191,9 +192,8 @@ export async function pushToGitHub(ghConfig, payload) {
     );
   }
 
-  // Step 2: Enrich invoices with calculated ESG metrics for repository auditability
   const enrichedPayload = {
-    schemaVersion: '1.0',
+    schemaVersion: '2.0',
     updatedAt: new Date().toISOString(),
     orgProfile: payload.orgProfile,
     invoices: payload.invoices.map((inv) => ({
@@ -285,14 +285,10 @@ export async function pushToGoogleSheets(gsConfig, payload) {
       scope: metrics.scope,
       normalizedEnergyKwh: Number(metrics.normalizedEnergyKwh.toFixed(2)),
       normalizedWaterM3: Number(metrics.normalizedWaterM3.toFixed(2)),
-      locationBasedCo2eTonnes: Number(
-        metrics.locationBasedCo2eTonnes.toFixed(4)
-      ),
-      marketBasedCo2eTonnes: Number(metrics.marketBasedCo2eTonnes.toFixed(4)),
+      co2eTonnes: Number(metrics.co2eTonnes.toFixed(4)),
     };
   });
 
-  // Using text/plain avoids CORS preflight rejection on Google Apps Script endpoints
   const res = await fetch(webAppUrl.trim(), {
     method: 'POST',
     redirect: 'follow',
@@ -342,28 +338,26 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Save full state in hidden/meta sheet for lossless 2-way sync
     let metaSheet = ss.getSheetByName('ESG_RawState') || ss.insertSheet('ESG_RawState');
     metaSheet.getRange('A1').setValue(JSON.stringify(payload));
     
-    // Write formatted ESG Ledger table to 'ESG_Invoices' sheet
     let tableSheet = ss.getSheetByName('ESG_Invoices') || ss.insertSheet('ESG_Invoices');
     tableSheet.clearContents();
     
     const headers = [
-      'Invoice #', 'Facility', 'Supplier', 'Category', 'Scope',
-      'Billing Start', 'Billing End', 'Quantity', 'Unit', 'Renewable %',
-      'Normalized Energy (kWh)', 'Water (m3)', 'Location CO2e (t)', 'Market CO2e (t)',
-      'Cost', 'Currency', 'Status', 'Notes'
+      'Invoice #', 'Site Name', 'Supplier', 'Category', 'Scope',
+      'Billing Start', 'Billing End', 'Usage', 'Unit',
+      'Normalized Energy (kWh)', 'Water (m3)', 'CO2e (t)',
+      'Net (£)', 'VAT Rate (%)', 'VAT (£)', 'Gross (£)', 'Currency', 'Reading Type', 'Notes'
     ];
     tableSheet.appendRow(headers);
     
     (payload.invoices || []).forEach(inv => {
       tableSheet.appendRow([
-        inv.invoiceNumber, inv.facility, inv.supplier, inv.category, inv.scope,
-        inv.billingPeriodStart, inv.billingPeriodEnd, inv.quantity, inv.unit, inv.renewablePct || 0,
-        inv.normalizedEnergyKwh, inv.normalizedWaterM3, inv.locationBasedCo2eTonnes, inv.marketBasedCo2eTonnes,
-        inv.cost, inv.currency, inv.status, inv.notes || ''
+        inv.invoiceNumber, inv.siteName, inv.supplier, inv.category, inv.scope,
+        inv.billingPeriodStart, inv.billingPeriodEnd, inv.usage, inv.unit,
+        inv.normalizedEnergyKwh, inv.normalizedWaterM3, inv.co2eTonnes,
+        inv.netCost, inv.vatRate, inv.vatAmount, inv.grossCost, 'GBP', inv.readingType, inv.notes || ''
       ]);
     });
     
@@ -376,33 +370,29 @@ function doPost(e) {
 }`;
 
 /**
- * Generates an audit-ready CSV string from invoices
+ * Generates an audit-ready CSV string from invoices (GBP £)
  */
 export function exportInvoicesToCsv(invoices) {
   const headers = [
     'Invoice ID',
     'Invoice Number',
-    'Facility',
+    'Site Name',
     'Supplier',
-    'Account Number',
     'Category',
-    'Subtype',
     'ESG Scope',
     'Billing Start',
     'Billing End',
-    'Invoice Date',
-    'Quantity',
+    'Usage',
     'Unit',
-    'Grid Region',
-    'Renewable %',
-    'Renewable Instrument',
     'Normalized Energy (kWh)',
     'Normalized Water (m3)',
-    'Location-Based GHG (tCO2e)',
-    'Market-Based GHG (tCO2e)',
-    'Total Cost',
+    'GHG Emissions (tCO2e)',
+    'Net Cost (GBP)',
+    'VAT Rate (%)',
+    'VAT Amount (GBP)',
+    'Gross Cost (GBP)',
     'Currency',
-    'Verification Status',
+    'Reading Type',
     'Notes',
   ];
 
@@ -418,30 +408,36 @@ export function exportInvoicesToCsv(invoices) {
   const rows = invoices.map((inv) => {
     const metrics = calculateInvoiceEsgMetrics(inv);
     const catName = UTILITY_CATEGORIES[inv.category]?.name || inv.category;
+    const usageVal = Number(inv.usage ?? inv.quantity) || 0;
+    const netVal = Number(inv.netCost ?? inv.cost) || 0;
+    const vatRateVal = Number(inv.vatRate ?? 20);
+    const vatAmtVal =
+      inv.vatAmount !== undefined
+        ? Number(inv.vatAmount)
+        : netVal * (vatRateVal / 100);
+    const grossVal =
+      inv.grossCost !== undefined ? Number(inv.grossCost) : netVal + vatAmtVal;
+
     return [
       inv.id,
       inv.invoiceNumber,
-      inv.facility,
-      inv.supplier,
-      inv.accountNumber || '',
+      inv.siteName || inv.facility || SITES[0],
+      inv.supplier || SUPPLIERS[0],
       catName,
-      inv.subtype || '',
       metrics.scope,
       inv.billingPeriodStart,
       inv.billingPeriodEnd,
-      inv.invoiceDate || '',
-      inv.quantity,
+      usageVal,
       inv.unit,
-      inv.gridRegion || 'US_EPA_AVG',
-      inv.renewablePct || 0,
-      inv.renewableInstrument || '',
       metrics.normalizedEnergyKwh.toFixed(2),
       metrics.normalizedWaterM3.toFixed(2),
-      metrics.locationBasedCo2eTonnes.toFixed(4),
-      metrics.marketBasedCo2eTonnes.toFixed(4),
-      inv.cost,
-      inv.currency || 'USD',
-      inv.status || 'Verified',
+      metrics.co2eTonnes.toFixed(4),
+      netVal.toFixed(2),
+      vatRateVal,
+      vatAmtVal.toFixed(2),
+      grossVal.toFixed(2),
+      'GBP',
+      inv.readingType || 'Actual',
       inv.notes || '',
     ]
       .map(escapeCsv)
@@ -452,7 +448,7 @@ export function exportInvoicesToCsv(invoices) {
 }
 
 /**
- * Parses a CSV file string into invoice records
+ * Parses a CSV file string into UK invoice records
  */
 export function parseCsvToInvoices(csvText) {
   const lines = csvText
@@ -460,7 +456,9 @@ export function parseCsvToInvoices(csvText) {
     .map((l) => l.trim())
     .filter(Boolean);
   if (lines.length < 2) {
-    throw new Error('CSV file must include a header row and at least one data row.');
+    throw new Error(
+      'CSV file must include a header row and at least one data row.'
+    );
   }
 
   const parseLine = (line) => {
@@ -492,17 +490,16 @@ export function parseCsvToInvoices(csvText) {
     headers.findIndex((h) => candidates.some((c) => h.includes(c)));
 
   const idxInvNum = findCol(['invoice number', 'invoice #', 'invoice_number']);
-  const idxFacility = findCol(['facility', 'site', 'location', 'building']);
-  const idxSupplier = findCol(['supplier', 'provider', 'utility', 'vendor']);
+  const idxSite = findCol(['site name', 'site', 'facility', 'location']);
+  const idxSupplier = findCol(['supplier', 'provider', 'utility']);
   const idxCategory = findCol(['category', 'type', 'utility type']);
   const idxStart = findCol(['billing start', 'start date', 'period start']);
   const idxEnd = findCol(['billing end', 'end date', 'period end']);
-  const idxQty = findCol(['quantity', 'usage', 'consumption', 'amount']);
+  const idxUsage = findCol(['usage', 'quantity', 'consumption']);
   const idxUnit = findCol(['unit', 'uom']);
-  const idxRenew = findCol(['renewable %', 'renewable', 'green %']);
-  const idxCost = findCol(['total cost', 'cost', 'spend', 'price']);
-  const idxCurrency = findCol(['currency']);
-  const idxStatus = findCol(['status', 'verification']);
+  const idxNet = findCol(['net cost', 'net', 'cost']);
+  const idxVatRate = findCol(['vat rate', 'vat %']);
+  const idxReading = findCol(['reading type', 'reading', 'status']);
   const idxNotes = findCol(['notes', 'comment']);
 
   const imported = [];
@@ -512,9 +509,13 @@ export function parseCsvToInvoices(csvText) {
 
     const rawCat = (idxCategory >= 0 ? cols[idxCategory] : '').toLowerCase();
     let category = 'electricity';
-    if (rawCat.includes('gas') || rawCat.includes('fuel') || rawCat.includes('diesel') || rawCat.includes('therm')) {
+    if (
+      rawCat.includes('gas') ||
+      rawCat.includes('fuel') ||
+      rawCat.includes('therm')
+    ) {
       category = 'natural_gas';
-    } else if (rawCat.includes('water') || rawCat.includes('sewage')) {
+    } else if (rawCat.includes('water')) {
       category = 'water';
     }
 
@@ -522,38 +523,35 @@ export function parseCsvToInvoices(csvText) {
       category === 'electricity'
         ? 'kWh'
         : category === 'natural_gas'
-        ? 'therms'
+        ? 'kWh'
         : 'm3';
+
+    const netCost = Number(idxNet >= 0 ? cols[idxNet] : 0) || 0;
+    const rawVat = idxVatRate >= 0 ? Number(cols[idxVatRate]) : 20;
+    const vatRate = [20, 5, 0].includes(rawVat) ? rawVat : 20;
+    const vatAmount = Number((netCost * (vatRate / 100)).toFixed(2));
+    const grossCost = Number((netCost + vatAmount).toFixed(2));
+
+    const rawReading = (idxReading >= 0 ? cols[idxReading] : '').toLowerCase();
+    const readingType = rawReading.includes('est') ? 'Estimated' : 'Actual';
 
     imported.push({
       id: `inv-csv-${Date.now()}-${i}`,
-      invoiceNumber:
-        (idxInvNum >= 0 && cols[idxInvNum]) || `CSV-${1000 + i}`,
-      facility:
-        (idxFacility >= 0 && cols[idxFacility]) || 'Main Facility',
-      supplier:
-        (idxSupplier >= 0 && cols[idxSupplier]) || 'Utility Provider',
-      accountNumber: '',
+      invoiceNumber: (idxInvNum >= 0 && cols[idxInvNum]) || `INV-${1000 + i}`,
+      siteName: (idxSite >= 0 && cols[idxSite]) || SITES[0],
+      supplier: (idxSupplier >= 0 && cols[idxSupplier]) || SUPPLIERS[0],
       category,
-      subtype:
-        category === 'electricity'
-          ? 'grid_electricity'
-          : category === 'natural_gas'
-          ? 'natural_gas'
-          : 'municipal_water',
-      billingPeriodStart:
-        (idxStart >= 0 && cols[idxStart]) || '2026-01-01',
+      billingPeriodStart: (idxStart >= 0 && cols[idxStart]) || '2026-01-01',
       billingPeriodEnd: (idxEnd >= 0 && cols[idxEnd]) || '2026-01-31',
-      invoiceDate: (idxEnd >= 0 && cols[idxEnd]) || '2026-02-01',
-      quantity: Number(idxQty >= 0 ? cols[idxQty] : 0) || 0,
+      usage: Number(idxUsage >= 0 ? cols[idxUsage] : 0) || 0,
       unit: (idxUnit >= 0 && cols[idxUnit]) || defaultUnit,
-      renewablePct: Number(idxRenew >= 0 ? cols[idxRenew] : 0) || 0,
-      renewableInstrument: '',
-      gridRegion: 'US_EPA_AVG',
-      cost: Number(idxCost >= 0 ? cols[idxCost] : 0) || 0,
-      currency: (idxCurrency >= 0 && cols[idxCurrency]) || 'USD',
-      status: (idxStatus >= 0 && cols[idxStatus]) || 'Verified',
-      notes: (idxNotes >= 0 && cols[idxNotes]) || 'Imported via CSV',
+      netCost,
+      vatRate,
+      vatAmount,
+      grossCost,
+      currency: 'GBP',
+      readingType,
+      notes: (idxNotes >= 0 && cols[idxNotes]) || '',
     });
   }
 
