@@ -3,13 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EcoLedger ESG — UK Business Energy & Utility Invoice Tracker</title>
+    <title>UK Energy & Emissions Ledger — ESG Invoice Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+            },
+          },
+        },
+      };
+    </script>
     <style>
-      body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+      body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+      @keyframes wordReveal {
+        0% { opacity: 0; transform: translateY(65%); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(4px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      .animate-word-reveal {
+        animation: wordReveal 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
       @media print {
         .no-print { display: none !important; }
         body { background: white !important; }
@@ -26,16 +52,16 @@
     </script>
     <script src="https://unpkg.com/@babel/standalone@7.26.2/babel.min.js"></script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased">
+  <body class="bg-[#F8F9FA] text-slate-900 antialiased">
     <div id="root"></div>
     <script type="text/babel" data-type="module">
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Zap, Flame, Droplets, Building2, Leaf, PoundSterling, Plus, CheckCircle2, AlertCircle, X, Calculator, Search, Download, Upload, Edit3, Copy, Trash2, Clock, FileDown, Github, FileSpreadsheet, HardDrive, RefreshCw, UploadCloud, DownloadCloud, AlertTriangle, Check, LayoutDashboard, Receipt, Cloud } from 'lucide-react';
+import { Zap, Flame, Droplets, Building2, Plus, CheckCircle2, AlertCircle, X, Search, Download, Upload, Edit3, Copy, Trash2, Clock, FileDown, FileText, Lock, ExternalLink, ArrowUpRight, Github, FileSpreadsheet, HardDrive, RefreshCw, UploadCloud, DownloadCloud, AlertTriangle, Check, LayoutDashboard, Receipt, Cloud } from 'lucide-react';
 
 // --- File: emissionFactors.js ---
 /**
- * UK DEFRA / DESNZ GHG Conversion Factors & Utility Definitions
+ * UK DEFRA / DESNZ GHG Conversion Factors & Validation Rules
  * Configured for UK Business Energy & ESG Invoice Tracking (GBP £)
  */
 
@@ -51,9 +77,9 @@ const SITES = [
 const READING_TYPES = ['Actual', 'Estimated'];
 
 const VAT_RATES = [
-  { value: 20, label: '20% (Standard Rate)' },
-  { value: 5, label: '5% (Reduced / De Minimis)' },
-  { value: 0, label: '0% (Zero Rated)' },
+  { value: 20, label: '20% Standard Rate' },
+  { value: 5, label: '5% Reduced / De Minimis' },
+  { value: 0, label: '0% Zero Rated' },
 ];
 
 const UTILITY_CATEGORIES = {
@@ -61,8 +87,8 @@ const UTILITY_CATEGORIES = {
     id: 'electricity',
     name: 'Electricity',
     scope: 'Scope 2',
-    color: '#2563eb', // blue-600
-    // UK DEFRA Grid Electricity factor (kgCO2e per kWh)
+    color: '#0f172a',
+    accentColor: '#2563eb',
     kgCo2ePerKwh: 0.207,
     units: [
       {
@@ -81,8 +107,8 @@ const UTILITY_CATEGORIES = {
     id: 'natural_gas',
     name: 'Natural Gas & Fuels',
     scope: 'Scope 1',
-    color: '#d97706', // amber-600
-    // UK DEFRA Natural Gas factor (kgCO2e per kWh)
+    color: '#b45309',
+    accentColor: '#d97706',
     kgCo2ePerKwh: 0.1829,
     units: [
       {
@@ -93,8 +119,8 @@ const UTILITY_CATEGORIES = {
       {
         id: 'm3',
         label: 'm³ (Cubic Metres)',
-        toKwh: 11.1868, // UK standard m³ to kWh conversion
-        kgCo2ePerUnitOverride: 2.046, // UK DEFRA kgCO2e per m³ natural gas
+        toKwh: 11.1868,
+        kgCo2ePerUnitOverride: 2.046,
       },
       {
         id: 'therms',
@@ -114,8 +140,8 @@ const UTILITY_CATEGORIES = {
     id: 'water',
     name: 'Water & Wastewater',
     scope: 'Water',
-    color: '#0891b2', // cyan-600
-    // UK DEFRA Water Supply factor (kgCO2e per m³)
+    color: '#0e7490',
+    accentColor: '#0891b2',
     kgCo2ePerM3: 0.149,
     units: [
       {
@@ -130,8 +156,8 @@ const UTILITY_CATEGORIES = {
       },
       {
         id: 'gallons',
-        label: 'Gallons',
-        toM3: 0.00454609, // Imperial gallon to m³
+        label: 'Gallons (Imperial)',
+        toM3: 0.00454609,
       },
     ],
   },
@@ -189,7 +215,6 @@ function calculateInvoiceEsgMetrics(invoice) {
     };
   }
 
-  // Water & Wastewater
   const unitObj =
     UTILITY_CATEGORIES.water.units.find((u) => u.id === invoice.unit) ||
     UTILITY_CATEGORIES.water.units[0];
@@ -206,11 +231,124 @@ function calculateInvoiceEsgMetrics(invoice) {
   };
 }
 
-// Start with an empty invoice ledger (no USD or test invoices)
+/**
+ * Comprehensive validation for utility invoice entry to prevent missing or erroneous data
+ */
+function validateInvoiceForm(
+  form,
+  existingInvoices = [],
+  editingId = null
+) {
+  const errors = {};
+
+  // 1. Invoice Number
+  const invNum = String(form.invoiceNumber || '').trim();
+  if (!invNum) {
+    errors.invoiceNumber = 'Invoice reference number is required.';
+  } else if (invNum.length < 3) {
+    errors.invoiceNumber = 'Invoice number must be at least 3 characters.';
+  } else {
+    const isDuplicate = existingInvoices.some(
+      (inv) =>
+        inv.id !== editingId &&
+        String(inv.invoiceNumber || '')
+          .trim()
+          .toLowerCase() === invNum.toLowerCase()
+    );
+    if (isDuplicate) {
+      errors.invoiceNumber = `Invoice "${invNum}" already exists in the ledger.`;
+    }
+  }
+
+  // 2. Supplier & Site Name
+  if (!SUPPLIERS.includes(form.supplier)) {
+    errors.supplier = 'Select a valid UK utilities provider.';
+  }
+  if (!SITES.includes(form.siteName)) {
+    errors.siteName = 'Select a valid UK site location.';
+  }
+
+  // 3. Dates (Invoice Date, Billing Start, Billing End)
+  if (!form.invoiceDate) {
+    errors.invoiceDate = 'Invoice date is required.';
+  }
+  if (!form.billingPeriodStart) {
+    errors.billingPeriodStart = 'Billing start date is required.';
+  }
+  if (!form.billingPeriodEnd) {
+    errors.billingPeriodEnd = 'Billing end date is required.';
+  }
+
+  if (form.billingPeriodStart && form.billingPeriodEnd) {
+    const start = new Date(form.billingPeriodStart);
+    const end = new Date(form.billingPeriodEnd);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      errors.billingPeriodEnd = 'Invalid billing period dates.';
+    } else if (end < start) {
+      errors.billingPeriodEnd =
+        'Billing end date cannot be earlier than the billing start date.';
+    } else {
+      const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+      if (diffDays > 370) {
+        errors.billingPeriodEnd =
+          'Billing period exceeds 12 months. Please verify start and end dates.';
+      }
+    }
+  }
+
+  if (form.invoiceDate && form.billingPeriodStart) {
+    const invDate = new Date(form.invoiceDate);
+    const start = new Date(form.billingPeriodStart);
+    if (!isNaN(invDate.getTime()) && !isNaN(start.getTime())) {
+      if (invDate < start) {
+        errors.invoiceDate =
+          'Invoice issue date cannot precede the billing period start date.';
+      }
+    }
+  }
+
+  // 4. Reading Type
+  if (!READING_TYPES.includes(form.readingType)) {
+    errors.readingType = 'Select Actual or Estimated reading type.';
+  }
+
+  // 5. Usage
+  const usageStr = String(form.usage ?? '').trim();
+  const usageVal = Number(usageStr);
+  if (usageStr === '' || isNaN(usageVal)) {
+    errors.usage = 'Metered usage value is required.';
+  } else if (usageVal <= 0) {
+    errors.usage = 'Usage must be greater than zero.';
+  } else if (usageVal > 100000000) {
+    errors.usage = 'Usage exceeds plausible single-invoice threshold.';
+  }
+
+  // 6. Net Cost & VAT
+  const netStr = String(form.netCost ?? '').trim();
+  const netVal = Number(netStr);
+  if (netStr === '' || isNaN(netVal)) {
+    errors.netCost = 'Net invoice amount (£) is required.';
+  } else if (netVal <= 0) {
+    errors.netCost = 'Net amount (£) must be greater than zero.';
+  } else if (netVal > 10000000) {
+    errors.netCost = 'Net amount (£) exceeds plausible invoice threshold.';
+  }
+
+  const vatRateNum = Number(form.vatRate);
+  if (![20, 5, 0].includes(vatRateNum)) {
+    errors.vatRate = 'VAT rate must be 20%, 5%, or 0%.';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
 const INITIAL_SAMPLE_INVOICES = [];
 
 const DEFAULT_ORG_PROFILE = {
-  companyName: 'UK Business Energy Tracker',
+  companyName: 'UK Energy & ESG Ledger',
   reportingYear: '2026',
   defaultCurrency: 'GBP',
 };
@@ -278,7 +416,11 @@ function loadLocalState() {
 }
 
 function saveLocalInvoices(invoices) {
-  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  try {
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  } catch (err) {
+    console.error('Storage quota warning:', err);
+  }
 }
 
 function saveLocalOrgProfile(orgProfile) {
@@ -298,8 +440,12 @@ function saveBackendConfig(backendConfig) {
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + chunkSize)
+    );
   }
   return btoa(binary);
 }
@@ -366,7 +512,7 @@ async function pullFromGitHub(ghConfig) {
 }
 
 /**
- * GitHub API Integration — Commits JSON database directly to the repository
+ * GitHub API Integration — Commits JSON database (including PDF attachments) directly to repository
  */
 async function pushToGitHub(ghConfig, payload) {
   const { owner, repo, branch = 'main', filePath, token } = ghConfig;
@@ -404,7 +550,7 @@ async function pushToGitHub(ghConfig, payload) {
   }
 
   const enrichedPayload = {
-    schemaVersion: '2.0',
+    schemaVersion: '2.1',
     updatedAt: new Date().toISOString(),
     orgProfile: payload.orgProfile,
     invoices: payload.invoices.map((inv) => ({
@@ -415,7 +561,7 @@ async function pushToGitHub(ghConfig, payload) {
 
   const jsonString = JSON.stringify(enrichedPayload, null, 2);
   const body = {
-    message: `chore(esg): sync ${payload.invoices.length} utility invoices via EcoLedger ESG Tracker`,
+    message: `chore(esg): sync ${payload.invoices.length} utility invoices via UK Energy Ledger`,
     content: utf8ToBase64(jsonString),
     branch: branch.trim(),
   };
@@ -497,6 +643,7 @@ async function pushToGoogleSheets(gsConfig, payload) {
       normalizedEnergyKwh: Number(metrics.normalizedEnergyKwh.toFixed(2)),
       normalizedWaterM3: Number(metrics.normalizedWaterM3.toFixed(2)),
       co2eTonnes: Number(metrics.co2eTonnes.toFixed(4)),
+      pdfFileName: inv.pdfAttachment?.name || '',
     };
   });
 
@@ -556,19 +703,19 @@ function doPost(e) {
     tableSheet.clearContents();
     
     const headers = [
-      'Invoice #', 'Site Name', 'Supplier', 'Category', 'Scope',
+      'Invoice #', 'Invoice Date', 'Site Name', 'Supplier', 'Category', 'Scope',
       'Billing Start', 'Billing End', 'Usage', 'Unit',
       'Normalized Energy (kWh)', 'Water (m3)', 'CO2e (t)',
-      'Net (£)', 'VAT Rate (%)', 'VAT (£)', 'Gross (£)', 'Currency', 'Reading Type', 'Notes'
+      'Net (£)', 'VAT Rate (%)', 'VAT (£)', 'Gross (£)', 'Currency', 'Reading Type', 'PDF Document', 'Notes'
     ];
     tableSheet.appendRow(headers);
     
     (payload.invoices || []).forEach(inv => {
       tableSheet.appendRow([
-        inv.invoiceNumber, inv.siteName, inv.supplier, inv.category, inv.scope,
+        inv.invoiceNumber, inv.invoiceDate || '', inv.siteName, inv.supplier, inv.category, inv.scope,
         inv.billingPeriodStart, inv.billingPeriodEnd, inv.usage, inv.unit,
         inv.normalizedEnergyKwh, inv.normalizedWaterM3, inv.co2eTonnes,
-        inv.netCost, inv.vatRate, inv.vatAmount, inv.grossCost, 'GBP', inv.readingType, inv.notes || ''
+        inv.netCost, inv.vatRate, inv.vatAmount, inv.grossCost, 'GBP', inv.readingType, inv.pdfFileName || '', inv.notes || ''
       ]);
     });
     
@@ -587,6 +734,7 @@ function exportInvoicesToCsv(invoices) {
   const headers = [
     'Invoice ID',
     'Invoice Number',
+    'Invoice Date',
     'Site Name',
     'Supplier',
     'Category',
@@ -604,6 +752,7 @@ function exportInvoicesToCsv(invoices) {
     'Gross Cost (GBP)',
     'Currency',
     'Reading Type',
+    'PDF Document Attached',
     'Notes',
   ];
 
@@ -632,6 +781,7 @@ function exportInvoicesToCsv(invoices) {
     return [
       inv.id,
       inv.invoiceNumber,
+      inv.invoiceDate || '',
       inv.siteName || inv.facility || SITES[0],
       inv.supplier || SUPPLIERS[0],
       catName,
@@ -649,6 +799,7 @@ function exportInvoicesToCsv(invoices) {
       grossVal.toFixed(2),
       'GBP',
       inv.readingType || 'Actual',
+      inv.pdfAttachment?.name || 'None',
       inv.notes || '',
     ]
       .map(escapeCsv)
@@ -701,6 +852,7 @@ function parseCsvToInvoices(csvText) {
     headers.findIndex((h) => candidates.some((c) => h.includes(c)));
 
   const idxInvNum = findCol(['invoice number', 'invoice #', 'invoice_number']);
+  const idxInvDate = findCol(['invoice date', 'issue date', 'date']);
   const idxSite = findCol(['site name', 'site', 'facility', 'location']);
   const idxSupplier = findCol(['supplier', 'provider', 'utility']);
   const idxCategory = findCol(['category', 'type', 'utility type']);
@@ -746,14 +898,17 @@ function parseCsvToInvoices(csvText) {
     const rawReading = (idxReading >= 0 ? cols[idxReading] : '').toLowerCase();
     const readingType = rawReading.includes('est') ? 'Estimated' : 'Actual';
 
+    const endDate = (idxEnd >= 0 && cols[idxEnd]) || '2026-01-31';
+
     imported.push({
       id: `inv-csv-${Date.now()}-${i}`,
       invoiceNumber: (idxInvNum >= 0 && cols[idxInvNum]) || `INV-${1000 + i}`,
+      invoiceDate: (idxInvDate >= 0 && cols[idxInvDate]) || endDate,
       siteName: (idxSite >= 0 && cols[idxSite]) || SITES[0],
       supplier: (idxSupplier >= 0 && cols[idxSupplier]) || SUPPLIERS[0],
       category,
       billingPeriodStart: (idxStart >= 0 && cols[idxStart]) || '2026-01-01',
-      billingPeriodEnd: (idxEnd >= 0 && cols[idxEnd]) || '2026-01-31',
+      billingPeriodEnd: endDate,
       usage: Number(idxUsage >= 0 ? cols[idxUsage] : 0) || 0,
       unit: (idxUnit >= 0 && cols[idxUnit]) || defaultUnit,
       netCost,
@@ -763,10 +918,101 @@ function parseCsvToInvoices(csvText) {
       currency: 'GBP',
       readingType,
       notes: (idxNotes >= 0 && cols[idxNotes]) || '',
+      pdfAttachment: null,
     });
   }
 
   return imported;
+}
+
+
+// --- File: AnimatedText.jsx ---
+
+/**
+ * Smoothly interpolates numerical KPI values with cubic-out easing
+ */
+function AnimatedNumber({
+  value = 0,
+  decimals = 2,
+  prefix = '',
+  suffix = '',
+  duration = 550,
+  className = '',
+}) {
+  const target = Number(value) || 0;
+  const [displayValue, setDisplayValue] = useState(target);
+  const prevValueRef = useRef(target);
+
+  useEffect(() => {
+    const startVal = prevValueRef.current;
+    const endVal = target;
+    if (Math.abs(endVal - startVal) < 0.0001) {
+      setDisplayValue(endVal);
+      prevValueRef.current = endVal;
+      return;
+    }
+
+    let rafId;
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      // Cubic ease-out: 1 - (1 - t)^3
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = startVal + (endVal - startVal) * eased;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
+        setDisplayValue(endVal);
+        prevValueRef.current = endVal;
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [target, duration]);
+
+  const formatted = displayValue.toLocaleString('en-GB', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+  return (
+    <span className={`tabular-nums ${className}`}>
+      {prefix}
+      {formatted}
+      {suffix}
+    </span>
+  );
+}
+
+/**
+ * Staggered word-by-word editorial text reveal animation
+ */
+function RevealText({ text = '', className = '', delayMs = 0 }) {
+  const words = String(text).split(' ');
+  return (
+    <span className={`inline-flex flex-wrap gap-x-[0.28em] ${className}`}>
+      {words.map((word, idx) => (
+        <span key={`${word}-${idx}`} className="overflow-hidden inline-block">
+          <span
+            className="inline-block animate-word-reveal"
+            style={{
+              animationDelay: `${delayMs + idx * 38}ms`,
+              animationFillMode: 'both',
+            }}
+          >
+            {word}
+          </span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 
@@ -780,6 +1026,7 @@ function DashboardView({
   selectedYear,
   onSelectYear,
   onOpenNewInvoice,
+  onSwitchTab,
 }) {
   const siteOptions = ['All Sites', ...SITES];
 
@@ -818,6 +1065,7 @@ function DashboardView({
     let totalVat = 0;
     let totalGross = 0;
     let actualReadingCount = 0;
+    let pdfAttachedCount = 0;
 
     const monthlyMap = {};
     const siteMap = {};
@@ -851,6 +1099,9 @@ function DashboardView({
 
       if ((inv.readingType || 'Actual') === 'Actual') {
         actualReadingCount++;
+      }
+      if (inv.pdfAttachment?.dataUrl) {
+        pdfAttachedCount++;
       }
 
       if (inv.category === 'electricity') {
@@ -932,6 +1183,7 @@ function DashboardView({
       totalVat,
       totalGross,
       actualReadingCount,
+      pdfAttachedCount,
       monthlySeries,
       siteSeries,
     };
@@ -943,19 +1195,28 @@ function DashboardView({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Top Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-500" />
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Site Name:
-            </label>
+    <div className="space-y-6 animate-fade-in">
+      {/* Editorial Page Header & Filter Bar */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-slate-400">
+            UK Commercial Utility & Emissions Overview
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mt-0.5">
+            <RevealText text="Energy & ESG Performance Ledger" />
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
+            <Building2 className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Site:
+            </span>
             <select
               value={selectedSite}
               onChange={(e) => onSelectSite(e.target.value)}
-              className="text-sm font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="text-xs font-semibold bg-transparent text-slate-800 focus:outline-none"
             >
               {siteOptions.map((s) => (
                 <option key={s} value={s}>
@@ -965,14 +1226,14 @@ function DashboardView({
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Reporting Year:
-            </label>
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Period:
+            </span>
             <select
               value={selectedYear}
               onChange={(e) => onSelectYear(e.target.value)}
-              className="text-sm font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="text-xs font-semibold bg-transparent text-slate-800 focus:outline-none"
             >
               {years.map((y) => (
                 <option key={y} value={y}>
@@ -981,239 +1242,251 @@ function DashboardView({
               ))}
             </select>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onOpenNewInvoice}
-          className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <Plus className="w-4 h-4" />
-          Log Utility Invoice
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium px-3 py-2 rounded-lg cursor-not-allowed select-none"
+            title="Legacy Excel (.xlsx) workbook ingestion is locked during the testing phase"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Upload Excel (.xlsx)</span>
+            <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded">
+              Testing
+            </span>
+          </button>
 
-      {/* Primary ESG KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Card 1: Total GHG Footprint */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
-                Total Carbon Footprint
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.totalGhgTonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Calculated using UK DEFRA emission factors
-              </p>
-            </div>
-            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Leaf className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Scope 2 Electricity */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
-                Scope 2 · Electricity
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.scope2Tonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.electricityKwh.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}{' '}
-                kWh ({(summary.electricityKwh / 1000).toFixed(2)} MWh)
-              </p>
-            </div>
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-              <Zap className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Scope 1 Natural Gas & Fuels */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full">
-                Scope 1 · Natural Gas & Fuels
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.scope1Tonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.fuelKwhEq.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}{' '}
-                kWh-eq ({(summary.fuelKwhEq / 1000).toFixed(2)} MWh)
-              </p>
-            </div>
-            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-              <Flame className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Total Energy Consumption */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Energy Consumption
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  {summary.totalEnergyMwh.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">MWh</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Combined Electricity + Natural Gas usage
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 5: Water & Wastewater */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-cyan-700">
-                Water & Wastewater
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  {summary.waterM3.toFixed(1)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">m³</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.waterTonnes.toFixed(3)} tCO₂e embodied emissions
-              </p>
-            </div>
-            <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg">
-              <Droplets className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 6: Total Utility Spend (£ GBP Net, VAT & Gross) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Utility Spend (£ GBP)
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  £
-                  {summary.totalGross.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  Gross ({filteredInvoices.length} invoices)
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Net: £
-                {summary.totalNet.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{' '}
-                · VAT: £
-                {summary.totalVat.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
-                {filteredInvoices.length > 0 &&
-                summary.actualReadingCount === filteredInvoices.length ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>100% Actual Meter Readings</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                    <span>
-                      {summary.actualReadingCount} of {filteredInvoices.length}{' '}
-                      Actual readings
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="p-2 bg-slate-100 text-slate-700 rounded-lg">
-              <PoundSterling className="w-5 h-5" />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenNewInvoice}
+            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-2xs transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Log Utility Invoice
+          </button>
         </div>
       </div>
 
-      {/* Charts & Site Breakdown Row */}
+      {/* Architectural Hairline Metric Grid */}
+      <div className="bg-slate-200/90 border border-slate-200/90 rounded-xl overflow-hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[1px] shadow-2xs">
+        {/* Metric 1: Total GHG Footprint */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              01 / Total Carbon Footprint
+            </span>
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+              UK DEFRA
+            </span>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalGhgTonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Combined Scope 1, Scope 2 & Water</span>
+            <span className="font-mono text-slate-700">
+              {filteredInvoices.length} records
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 2: Scope 2 Electricity */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              02 / Scope 2 · Electricity
+            </span>
+            <span className="w-2 h-2 rounded-full bg-slate-900" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.scope2Tonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>
+              <AnimatedNumber
+                value={summary.electricityKwh}
+                decimals={0}
+                suffix=" kWh"
+              />
+            </span>
+            <span>{(summary.electricityKwh / 1000).toFixed(2)} MWh</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Scope 1 Natural Gas */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              03 / Scope 1 · Natural Gas & Fuels
+            </span>
+            <span className="w-2 h-2 rounded-full bg-amber-600" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.scope1Tonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>
+              <AnimatedNumber
+                value={summary.fuelKwhEq}
+                decimals={0}
+                suffix=" kWh-eq"
+              />
+            </span>
+            <span>{(summary.fuelKwhEq / 1000).toFixed(2)} MWh</span>
+          </div>
+        </div>
+
+        {/* Metric 4: Total Energy Consumption */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              04 / Total Energy Input
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">
+              MWh Equivalent
+            </span>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalEnergyMwh}
+              decimals={2}
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">MWh</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            Normalized across Electricity & Stationary Fuels
+          </div>
+        </div>
+
+        {/* Metric 5: Water & Wastewater */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              05 / Water & Wastewater
+            </span>
+            <span className="w-2 h-2 rounded-full bg-cyan-600" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.waterM3}
+              decimals={1}
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">m³</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>Embodied Emissions:</span>
+            <span>{summary.waterTonnes.toFixed(3)} tCO₂e</span>
+          </div>
+        </div>
+
+        {/* Metric 6: Financial Settlement (£ GBP Net, VAT & Gross) */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              06 / Financial Expenditure (£ GBP)
+            </span>
+            {filteredInvoices.length > 0 &&
+            summary.actualReadingCount === filteredInvoices.length ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                <CheckCircle2 className="w-3 h-3" />
+                100% Actual
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500">
+                {summary.actualReadingCount}/{filteredInvoices.length} Actual
+              </span>
+            )}
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalGross}
+              decimals={2}
+              prefix="£"
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-[11px] font-mono text-slate-400">Gross</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+            <span>
+              Net: £
+              {summary.totalNet.toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span>
+              VAT: £
+              {summary.totalVat.toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts & UK Site Allocation Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly GHG Emissions Stacked Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-slate-400">
+                  Temporal Trajectory
+                </div>
+                <h3 className="text-sm font-semibold text-slate-900 mt-0.5">
                   Monthly GHG Emissions Profile (tCO₂e)
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Stacked Scope 1 (Natural Gas) + Scope 2 (Electricity) + Water
-                </p>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block" />
-                  Scope 1 (Gas)
+              <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-amber-600 inline-block" />
+                  Scope 1
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-blue-600 inline-block" />
-                  Scope 2 (Electricity)
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-slate-900 inline-block" />
+                  Scope 2
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-cyan-500 inline-block" />
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-cyan-600 inline-block" />
                   Water
                 </span>
               </div>
             </div>
 
             {summary.monthlySeries.length === 0 ? (
-              <div className="h-60 flex flex-col items-center justify-center text-slate-400 text-sm border border-dashed border-slate-200 rounded-lg">
-                <p>No utility invoices logged yet.</p>
+              <div className="h-60 mt-4 flex flex-col items-center justify-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-lg bg-slate-50/40">
+                <p className="font-medium text-slate-600">
+                  No utility invoices logged in the ledger
+                </p>
+                <p className="text-slate-400 mt-0.5">
+                  Add an invoice for Head Office London, Sheffield, Leeds, or
+                  Bristol to generate analytics.
+                </p>
                 <button
                   type="button"
                   onClick={onOpenNewInvoice}
-                  className="mt-2 text-emerald-600 font-semibold hover:underline"
+                  className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
                 >
-                  + Log your first utility invoice
+                  + Log Utility Invoice
                 </button>
               </div>
             ) : (
@@ -1233,33 +1506,33 @@ function DashboardView({
                       key={item.month}
                       className="flex-1 flex flex-col items-center h-full justify-end group"
                     >
-                      <div className="text-[11px] font-semibold text-slate-600 mb-1.5">
+                      <div className="text-[10px] font-mono font-semibold text-slate-600 mb-1.5 tabular-nums">
                         {total.toFixed(2)}t
                       </div>
-                      <div className="w-full max-w-[54px] flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-100 h-44 justify-start">
+                      <div className="w-full max-w-[48px] flex flex-col-reverse rounded-t overflow-hidden bg-slate-100 h-44 justify-start">
                         {s1 > 0 && (
                           <div
                             style={{ height: `${Math.max(4, s1Pct)}%` }}
-                            className="bg-amber-500 transition-all"
-                            title={`Scope 1: ${s1.toFixed(2)} tCO₂e`}
+                            className="bg-amber-600 transition-all duration-500"
+                            title={`Scope 1: ${s1.toFixed(3)} tCO₂e`}
                           />
                         )}
                         {s2 > 0 && (
                           <div
                             style={{ height: `${Math.max(4, s2Pct)}%` }}
-                            className="bg-blue-600 transition-all"
-                            title={`Scope 2: ${s2.toFixed(2)} tCO₂e`}
+                            className="bg-slate-900 transition-all duration-500"
+                            title={`Scope 2: ${s2.toFixed(3)} tCO₂e`}
                           />
                         )}
                         {w > 0 && (
                           <div
                             style={{ height: `${Math.max(2, wPct)}%` }}
-                            className="bg-cyan-500 transition-all"
+                            className="bg-cyan-600 transition-all duration-500"
                             title={`Water: ${w.toFixed(3)} tCO₂e`}
                           />
                         )}
                       </div>
-                      <span className="mt-2 text-xs font-medium text-slate-600">
+                      <span className="mt-2 text-[11px] font-mono text-slate-500">
                         {item.month}
                       </span>
                     </div>
@@ -1269,23 +1542,34 @@ function DashboardView({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Suppliers supported: EDF, SSE, EON, Octopus</span>
-            <span>Currency: £ GBP (Net, VAT & Gross)</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span className="font-mono">
+              Approved Providers: EDF · SSE · EON · Octopus
+            </span>
+            <button
+              type="button"
+              onClick={() => onSwitchTab && onSwitchTab('invoices')}
+              className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:underline"
+            >
+              <span>Open Full Invoice Ledger</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Site Breakdown Panel */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+        {/* UK Site Breakdown Panel */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
-              Emissions by Site Name
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              UK office energy & GHG breakdown
-            </p>
+            <div className="pb-4 border-b border-slate-100">
+              <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-slate-400">
+                Regional Allocation
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900 mt-0.5">
+                Emissions by Site Name
+              </h3>
+            </div>
 
-            <div className="space-y-3">
+            <div className="mt-4 divide-y divide-slate-100">
               {summary.siteSeries.map((site) => {
                 const siteTotal = site.scope1 + site.scope2 + site.waterTonnes;
                 const sharePct =
@@ -1294,29 +1578,28 @@ function DashboardView({
                     : 0;
 
                 return (
-                  <div
-                    key={site.siteName}
-                    className="p-3 rounded-lg bg-slate-50 border border-slate-200/80"
-                  >
-                    <div className="flex items-center justify-between text-sm font-semibold text-slate-800">
-                      <span className="truncate">{site.siteName}</span>
-                      <span className="text-emerald-700">
+                  <div key={site.siteName} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-900">
+                        {site.siteName}
+                      </span>
+                      <span className="font-mono font-semibold text-slate-900 tabular-nums">
                         {siteTotal.toFixed(2)} tCO₂e
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                    <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-slate-400 tabular-nums">
                       <span>
                         {site.energyMwh.toFixed(2)} MWh · £
-                        {site.grossCost.toLocaleString(undefined, {
+                        {site.grossCost.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </span>
-                      <span>{site.invoiceCount} invoices</span>
+                      <span>{site.invoiceCount} records</span>
                     </div>
-                    <div className="mt-2 w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="mt-2 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
+                        className="h-full bg-slate-900 rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, sharePct)}%` }}
                       />
                     </div>
@@ -1326,9 +1609,11 @@ function DashboardView({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
-            Click <strong>Utility Invoices</strong> above to view, edit, or
-            bulk-import bills.
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>PDF Invoices Stored in DB:</span>
+            <span className="text-slate-700 font-semibold">
+              {summary.pdfAttachedCount} / {filteredInvoices.length}
+            </span>
           </div>
         </div>
       </div>
@@ -1341,8 +1626,9 @@ function DashboardView({
 
 const EMPTY_FORM = {
   invoiceNumber: '',
-  supplier: SUPPLIERS[0], // EDF
-  siteName: SITES[0], // Head Office London
+  invoiceDate: '2026-05-02',
+  supplier: SUPPLIERS[0],
+  siteName: SITES[0],
   category: 'electricity',
   billingPeriodStart: '2026-04-01',
   billingPeriodEnd: '2026-04-30',
@@ -1355,6 +1641,7 @@ const EMPTY_FORM = {
   grossCost: '0.00',
   currency: 'GBP',
   notes: '',
+  pdfAttachment: null,
 };
 
 function InvoiceModal({
@@ -1362,10 +1649,19 @@ function InvoiceModal({
   onClose,
   onSave,
   editingInvoice,
+  existingInvoices = [],
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const pdfInputRef = useRef(null);
 
   useEffect(() => {
+    setTouched({});
+    setSubmitAttempted(false);
+    setPdfError('');
+
     if (editingInvoice) {
       const net = Number(editingInvoice.netCost ?? editingInvoice.cost) || 0;
       const rate =
@@ -1384,6 +1680,10 @@ function InvoiceModal({
       setForm({
         ...EMPTY_FORM,
         ...editingInvoice,
+        invoiceDate:
+          editingInvoice.invoiceDate ||
+          editingInvoice.billingPeriodEnd ||
+          '2026-05-02',
         siteName: editingInvoice.siteName || editingInvoice.facility || SITES[0],
         supplier: SUPPLIERS.includes(editingInvoice.supplier)
           ? editingInvoice.supplier
@@ -1392,21 +1692,44 @@ function InvoiceModal({
           ? editingInvoice.readingType
           : 'Actual',
         usage: editingInvoice.usage ?? editingInvoice.quantity ?? '',
-        netCost: net,
+        netCost: net > 0 ? String(net) : '',
         vatRate: rate,
         vatAmount: vat.toFixed(2),
         grossCost: gross.toFixed(2),
         currency: 'GBP',
+        pdfAttachment: editingInvoice.pdfAttachment || null,
       });
     } else {
+      const todayIso = new Date().toISOString().slice(0, 10);
       setForm({
         ...EMPTY_FORM,
+        invoiceDate: todayIso,
         invoiceNumber: `INV-${new Date().getFullYear()}-${String(
-          Math.floor(100 + Math.random() * 900)
+          Math.floor(1000 + Math.random() * 9000)
         )}`,
       });
     }
   }, [editingInvoice, isOpen]);
+
+  const validation = useMemo(() => {
+    return validateInvoiceForm(form, existingInvoices, editingInvoice?.id);
+  }, [form, existingInvoices, editingInvoice]);
+
+  const liveMetrics = useMemo(() => {
+    return calculateInvoiceEsgMetrics(form);
+  }, [form]);
+
+  if (!isOpen) return null;
+
+  const currentCat =
+    UTILITY_CATEGORIES[form.category] || UTILITY_CATEGORIES.electricity;
+
+  const markTouched = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const showError = (field) =>
+    (touched[field] || submitAttempted) && validation.errors[field];
 
   const handleCategoryChange = (newCategory) => {
     const catObj = UTILITY_CATEGORIES[newCategory];
@@ -1432,20 +1755,66 @@ function InvoiceModal({
     }));
   };
 
-  const liveMetrics = useMemo(() => {
-    return calculateInvoiceEsgMetrics(form);
-  }, [form]);
+  const handlePdfUpload = (e) => {
+    setPdfError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  if (!isOpen) return null;
+    const isPdf =
+      file.type === 'application/pdf' ||
+      file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setPdfError('Only PDF documents (.pdf) are permitted for invoice records.');
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+      return;
+    }
 
-  const currentCat =
-    UTILITY_CATEGORIES[form.category] || UTILITY_CATEGORIES.electricity;
+    // 5 MB limit for database/JSON storage
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setPdfError('PDF file size must be under 5.0 MB for database storage.');
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = String(ev.target?.result || '');
+      setForm((prev) => ({
+        ...prev,
+        pdfAttachment: {
+          name: file.name,
+          size: file.size,
+          type: 'application/pdf',
+          uploadedAt: new Date().toISOString(),
+          dataUrl,
+        },
+      }));
+    };
+    reader.onerror = () => {
+      setPdfError('Failed to read PDF file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePreviewPdf = () => {
+    if (!form.pdfAttachment?.dataUrl) return;
+    const win = window.open();
+    if (win) {
+      win.document.write(
+        `<iframe src="${form.pdfAttachment.dataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
+      );
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.invoiceNumber || !form.supplier || !form.siteName) {
+    setSubmitAttempted(true);
+
+    if (!validation.isValid || pdfError) {
       return;
     }
+
     const netNum = Number(form.netCost) || 0;
     const rateNum = Number(form.vatRate);
     const vatNum = Number((netNum * (rateNum / 100)).toFixed(2));
@@ -1454,7 +1823,8 @@ function InvoiceModal({
     onSave({
       ...form,
       id: editingInvoice?.id || `inv-${Date.now()}`,
-      usage: Number(form.usage) || 0,
+      invoiceNumber: String(form.invoiceNumber).trim(),
+      usage: Number(form.usage),
       netCost: netNum,
       vatRate: rateNum,
       vatAmount: vatNum,
@@ -1463,64 +1833,85 @@ function InvoiceModal({
     });
   };
 
+  const errorList = Object.values(validation.errors);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
-        {/* Modal Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
+        {/* Editorial Header */}
+        <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
           <div>
-            <h2 className="text-lg font-bold">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400">
+                Ledger Entry Form
+              </span>
+              <span className="text-slate-700">•</span>
+              <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-teal-400">
+                UK DEFRA Verified
+              </span>
+            </div>
+            <h2 className="text-base font-semibold tracking-tight mt-0.5">
               {editingInvoice
-                ? 'Edit Utility Invoice Record'
+                ? 'Amend Utility Invoice Record'
                 : 'Log Utility Invoice'}
             </h2>
-            <p className="text-xs text-slate-300">
-              Input UK utility invoice usage and Net / VAT / Gross costs (£ GBP)
-            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg"
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <form
           onSubmit={handleSubmit}
+          noValidate
           className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
         >
-          {/* Step 1: Utility Category Selector */}
+          {/* Validation Error Banner (shown if submit attempted with errors) */}
+          {submitAttempted && errorList.length > 0 && (
+            <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-900 space-y-1 animate-fade-in">
+              <div className="font-semibold flex items-center gap-1.5 text-red-800">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>
+                  Please resolve {errorList.length} verification{' '}
+                  {errorList.length === 1 ? 'issue' : 'issues'} before saving:
+                </span>
+              </div>
+              <ul className="list-disc list-inside pl-5 text-red-700 space-y-0.5">
+                {errorList.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 1. Utility Category Selector */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-              1. Utility Category
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              01 · Utility Stream
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {[
                 {
                   id: 'electricity',
                   title: 'Electricity',
-                  sub: 'Scope 2 · kWh, MWh',
+                  sub: 'Scope 2 · kWh / MWh',
                   icon: Zap,
-                  activeClass:
-                    'border-blue-600 bg-blue-50/70 text-blue-900 ring-2 ring-blue-500/20',
                 },
                 {
                   id: 'natural_gas',
                   title: 'Natural Gas & Fuels',
-                  sub: 'Scope 1 · kWh, m³, litres',
+                  sub: 'Scope 1 · kWh / m³',
                   icon: Flame,
-                  activeClass:
-                    'border-amber-600 bg-amber-50/70 text-amber-900 ring-2 ring-amber-500/20',
                 },
                 {
                   id: 'water',
                   title: 'Water & Wastewater',
-                  sub: 'Water · m³, kL',
+                  sub: 'Water · m³ / kL',
                   icon: Droplets,
-                  activeClass:
-                    'border-cyan-600 bg-cyan-50/70 text-cyan-900 ring-2 ring-cyan-500/20',
                 },
               ].map((item) => {
                 const Icon = item.icon;
@@ -1530,16 +1921,26 @@ function InvoiceModal({
                     key={item.id}
                     type="button"
                     onClick={() => handleCategoryChange(item.id)}
-                    className={`flex items-start gap-3 p-3 rounded-xl border text-left transition ${
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
                       isSelected
-                        ? item.activeClass
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
                         : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                     }`}
                   >
-                    <Icon className="w-5 h-5 mt-0.5 shrink-0" />
+                    <Icon
+                      className={`w-4 h-4 mt-0.5 shrink-0 ${
+                        isSelected ? 'text-teal-400' : 'text-slate-400'
+                      }`}
+                    />
                     <div>
-                      <div className="text-sm font-bold">{item.title}</div>
-                      <div className="text-xs opacity-80">{item.sub}</div>
+                      <div className="text-xs font-semibold">{item.title}</div>
+                      <div
+                        className={`text-[11px] ${
+                          isSelected ? 'text-slate-300' : 'text-slate-400'
+                        }`}
+                      >
+                        {item.sub}
+                      </div>
                     </div>
                   </button>
                 );
@@ -1547,138 +1948,224 @@ function InvoiceModal({
             </div>
           </div>
 
-          {/* Step 2: Invoice Number, Utilities Provider Dropdown, Site Name Dropdown */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Invoice Number *
-              </label>
-              <input
-                type="text"
-                required
-                value={form.invoiceNumber}
-                onChange={(e) =>
-                  setForm({ ...form, invoiceNumber: e.target.value })
-                }
-                placeholder="e.g. INV-2026-001"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Utilities Provider *
-              </label>
-              <select
-                value={form.supplier}
-                onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {SUPPLIERS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Site Name *
-              </label>
-              <select
-                value={form.siteName}
-                onChange={(e) => setForm({ ...form, siteName: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {SITES.map((site) => (
-                  <option key={site} value={site}>
-                    {site}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Billing Period & Reading Type */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Billing Start Date *
-              </label>
-              <input
-                type="date"
-                required
-                value={form.billingPeriodStart}
-                onChange={(e) =>
-                  setForm({ ...form, billingPeriodStart: e.target.value })
-                }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Billing End Date *
-              </label>
-              <input
-                type="date"
-                required
-                value={form.billingPeriodEnd}
-                onChange={(e) =>
-                  setForm({ ...form, billingPeriodEnd: e.target.value })
-                }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Reading Type *
-              </label>
-              <select
-                value={form.readingType}
-                onChange={(e) =>
-                  setForm({ ...form, readingType: e.target.value })
-                }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {READING_TYPES.map((rt) => (
-                  <option key={rt} value={rt}>
-                    {rt}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Step 3: Usage & Net / VAT / Gross (£ GBP) */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* 2. Invoice Reference, Utilities Provider, Site Name */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              02 · Account & Site Allocation
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Usage *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Invoice Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.invoiceNumber}
+                  onBlur={() => markTouched('invoiceNumber')}
+                  onChange={(e) =>
+                    setForm({ ...form, invoiceNumber: e.target.value })
+                  }
+                  placeholder="e.g. INV-2026-001"
+                  className={`w-full px-3 py-2 text-xs font-mono border rounded-lg focus:outline-none transition-colors ${
+                    showError('invoiceNumber')
+                      ? 'border-red-400 bg-red-50/40 focus:border-red-600'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('invoiceNumber') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.invoiceNumber}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Utilities Provider <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.supplier}
+                  onBlur={() => markTouched('supplier')}
+                  onChange={(e) =>
+                    setForm({ ...form, supplier: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {SUPPLIERS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Site Name <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.siteName}
+                  onBlur={() => markTouched('siteName')}
+                  onChange={(e) =>
+                    setForm({ ...form, siteName: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {SITES.map((site) => (
+                    <option key={site} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Dates & Reading Type (Invoice Date, Billing Start, Billing End, Reading Type) */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              03 · Tax Point & Meter Period
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Invoice Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.invoiceDate}
+                  onBlur={() => markTouched('invoiceDate')}
+                  onChange={(e) =>
+                    setForm({ ...form, invoiceDate: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                    showError('invoiceDate')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('invoiceDate') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.invoiceDate}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Billing Start <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.billingPeriodStart}
+                  onBlur={() => markTouched('billingPeriodStart')}
+                  onChange={(e) =>
+                    setForm({ ...form, billingPeriodStart: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                    showError('billingPeriodStart')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('billingPeriodStart') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.billingPeriodStart}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Billing End <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.billingPeriodEnd}
+                  onBlur={() => markTouched('billingPeriodEnd')}
+                  onChange={(e) =>
+                    setForm({ ...form, billingPeriodEnd: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                    showError('billingPeriodEnd')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('billingPeriodEnd') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.billingPeriodEnd}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Reading Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.readingType}
+                  onBlur={() => markTouched('readingType')}
+                  onChange={(e) =>
+                    setForm({ ...form, readingType: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {READING_TYPES.map((rt) => (
+                    <option key={rt} value={rt}>
+                      {rt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Usage & Financial Breakdown (£ GBP Net, VAT, Gross) */}
+          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 space-y-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              04 · Metered Usage & Financial Settlement (£ GBP)
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Usage <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   step="any"
-                  min="0"
+                  min="0.01"
                   required
                   value={form.usage}
+                  onBlur={() => markTouched('usage')}
                   onChange={(e) => setForm({ ...form, usage: e.target.value })}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 text-sm font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={`w-full px-3 py-2 text-xs font-mono font-semibold border rounded-lg focus:outline-none ${
+                    showError('usage')
+                      ? 'border-red-400 bg-red-50/50'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
                 />
+                {showError('usage') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.usage}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Unit of Measure *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Unit of Measure <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={form.unit}
                   onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
                 >
                   {currentCat.units.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -1689,36 +2176,46 @@ function InvoiceModal({
               </div>
             </div>
 
-            {/* Net, VAT Rate (20%, 5%, 0%), VAT (£), Gross (£), Currency (GBP) */}
-            <div className="pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {/* Net, VAT Rate (20%, 5%, 0%), VAT (£), Gross (£ GBP) */}
+            <div className="pt-3 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-5 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Net (£) *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Net (£) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   required
                   value={form.netCost}
+                  onBlur={() => markTouched('netCost')}
                   onChange={(e) =>
                     handleNetOrVatChange(e.target.value, form.vatRate)
                   }
                   placeholder="0.00"
-                  className="w-full px-3 py-2 text-sm font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={`w-full px-3 py-2 text-xs font-mono font-semibold border rounded-lg focus:outline-none ${
+                    showError('netCost')
+                      ? 'border-red-400 bg-red-50/50'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
                 />
+                {showError('netCost') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.netCost}
+                  </p>
+                )}
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Energy VAT Rate *
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Energy VAT Rate <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={form.vatRate}
                   onChange={(e) =>
                     handleNetOrVatChange(form.netCost, Number(e.target.value))
                   }
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
                 >
                   {VAT_RATES.map((vr) => (
                     <option key={vr.value} value={vr.value}>
@@ -1729,110 +2226,197 @@ function InvoiceModal({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   VAT (£)
                 </label>
                 <input
                   type="text"
                   readOnly
                   value={`£${form.vatAmount}`}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-100 text-slate-700 font-medium"
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg bg-slate-100 text-slate-700"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-slate-700 mb-1">
                   Gross (£ GBP)
                 </label>
                 <input
                   type="text"
                   readOnly
                   value={`£${form.grossCost}`}
-                  className="w-full px-3 py-2 text-sm border border-emerald-300 rounded-lg bg-emerald-50 text-emerald-900 font-bold"
+                  className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-lg bg-slate-900 text-white"
                 />
               </div>
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Invoice Notes / Meter Reference
-            </label>
-            <input
-              type="text"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Optional meter reference or billing note..."
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+          {/* 5. Invoice PDF Attachment (Stored in Database) & Audit Notes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Source Invoice PDF (Stored in Database)
+              </label>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handlePdfUpload}
+                className="hidden"
+              />
+              {!form.pdfAttachment ? (
+                <button
+                  type="button"
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="w-full px-3 py-2.5 border border-dashed border-slate-300 hover:border-slate-500 rounded-lg bg-slate-50/60 hover:bg-slate-100/70 text-xs text-slate-600 flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Attach Invoice PDF (max 5 MB)</span>
+                </button>
+              ) : (
+                <div className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-slate-700 shrink-0" />
+                    <div className="truncate">
+                      <div className="text-xs font-medium text-slate-900 truncate">
+                        {form.pdfAttachment.name}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-500">
+                        {((form.pdfAttachment.size || 0) / 1024).toFixed(1)} KB ·
+                        Stored in DB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handlePreviewPdf}
+                      className="p-1 text-slate-600 hover:text-slate-900 rounded"
+                      title="Open PDF in new tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, pdfAttachment: null }));
+                        if (pdfInputRef.current) pdfInputRef.current.value = '';
+                      }}
+                      className="p-1 text-slate-500 hover:text-red-600 rounded"
+                      title="Remove PDF"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {pdfError && (
+                <p className="mt-1 text-[11px] text-red-600">{pdfError}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Audit Notes / Meter Reference
+              </label>
+              <input
+                type="text"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Optional MPAN / MPRN or reference note..."
+                className="w-full px-3 py-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+              />
+            </div>
           </div>
 
-          {/* Live Calculated ESG Preview Banner */}
-          <div className="p-4 rounded-xl bg-emerald-950 text-white flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-emerald-800/80 text-emerald-300">
-                <Calculator className="w-5 h-5" />
+          {/* Live Calculated ESG Summary Bar */}
+          <div className="p-4 rounded-xl bg-slate-950 text-white flex flex-wrap items-center justify-between gap-4 border border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-teal-400">
+                  {liveMetrics.scope} Calculation
+                </span>
+                {validation.isValid ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Data Verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-300 bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded">
+                    Awaiting Required Fields
+                  </span>
+                )}
               </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-emerald-300 font-semibold">
-                  Calculated ESG Emissions ({liveMetrics.scope})
-                </div>
-                <div className="text-xs text-slate-300">
-                  {liveMetrics.effectiveFactorLabel}
-                </div>
+              <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                {liveMetrics.effectiveFactorLabel}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-6 text-right">
+            <div className="flex items-center gap-6 text-right font-mono">
               {form.category !== 'water' ? (
                 <div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
                     Normalized Energy
                   </div>
-                  <div className="text-sm font-bold text-white">
-                    {liveMetrics.normalizedEnergyKwh.toLocaleString(undefined, {
-                      maximumFractionDigits: 1,
-                    })}{' '}
-                    kWh
+                  <div className="text-sm font-semibold text-white">
+                    <AnimatedNumber
+                      value={liveMetrics.normalizedEnergyKwh}
+                      decimals={1}
+                      suffix=" kWh"
+                    />
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="text-[11px] text-slate-400">Water Volume</div>
-                  <div className="text-sm font-bold text-white">
-                    {liveMetrics.normalizedWaterM3.toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                    })}{' '}
-                    m³
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                    Normalized Volume
+                  </div>
+                  <div className="text-sm font-semibold text-white">
+                    <AnimatedNumber
+                      value={liveMetrics.normalizedWaterM3}
+                      decimals={2}
+                      suffix=" m³"
+                    />
                   </div>
                 </div>
               )}
 
               <div>
-                <div className="text-[11px] text-slate-400">GHG Emissions</div>
-                <div className="text-base font-bold text-emerald-400">
-                  {liveMetrics.co2eTonnes.toFixed(3)} tCO₂e
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  GHG Footprint
+                </div>
+                <div className="text-base font-bold text-teal-400">
+                  <AnimatedNumber
+                    value={liveMetrics.co2eTonnes}
+                    decimals={3}
+                    suffix=" tCO₂e"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Submit Footer */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-            >
-              {editingInvoice ? 'Save Changes' : 'Save Utility Invoice'}
-            </button>
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400">
+              All fields marked with <span className="text-red-500">*</span> are
+              mandatory for ESG audit integrity.
+            </span>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors"
+              >
+                {editingInvoice ? 'Save Amended Record' : 'Commit Invoice Entry'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -1857,6 +2441,7 @@ function InvoiceTable({
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [readingFilter, setReadingFilter] = useState('all');
   const [importError, setImportError] = useState('');
+  const [viewingPdfInvoice, setViewingPdfInvoice] = useState(null);
   const fileInputRef = useRef(null);
 
   const filtered = useMemo(() => {
@@ -1879,7 +2464,14 @@ function InvoiceTable({
         }
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
-          const hay = [inv.invoiceNumber, inv.supplier, invSite, inv.notes]
+          const hay = [
+            inv.invoiceNumber,
+            inv.invoiceDate,
+            inv.supplier,
+            invSite,
+            inv.notes,
+            inv.pdfAttachment?.name,
+          ]
             .filter(Boolean)
             .join(' ')
             .toLowerCase();
@@ -1914,10 +2506,10 @@ function InvoiceTable({
 
   const handleDownloadTemplate = () => {
     const sampleTemplate = [
-      'Invoice Number,Site Name,Supplier,Category,Billing Start,Billing End,Usage,Unit,Net Cost,VAT Rate,Reading Type,Notes',
-      'INV-2026-001,Head Office London,Octopus,Electricity,2026-01-01,2026-01-31,14500,kWh,3190.00,20,Actual,January electricity bill',
-      'INV-2026-002,Office Sheffield,EDF,Natural Gas,2026-01-01,2026-01-31,4200,kWh,336.00,5,Actual,De minimis 5% VAT rate',
-      'INV-2026-003,Office Leeds,EON,Electricity,2026-01-01,2026-01-31,8900,kWh,1958.00,20,Estimated,Estimated meter reading',
+      'Invoice Number,Invoice Date,Site Name,Supplier,Category,Billing Start,Billing End,Usage,Unit,Net Cost,VAT Rate,Reading Type,Notes',
+      'INV-2026-001,2026-02-03,Head Office London,Octopus,Electricity,2026-01-01,2026-01-31,14500,kWh,3190.00,20,Actual,January electricity bill',
+      'INV-2026-002,2026-02-04,Office Sheffield,EDF,Natural Gas,2026-01-01,2026-01-31,4200,kWh,336.00,5,Actual,De minimis 5% VAT rate',
+      'INV-2026-003,2026-02-05,Office Leeds,EON,Electricity,2026-01-01,2026-01-31,8900,kWh,1958.00,20,Estimated,Estimated meter reading',
     ].join('\n');
 
     const blob = new Blob([sampleTemplate], {
@@ -1957,16 +2549,44 @@ function InvoiceTable({
 
   const getCategoryIcon = (cat) => {
     if (cat === 'electricity')
-      return <Zap className="w-4 h-4 text-blue-600 shrink-0" />;
+      return <Zap className="w-3.5 h-3.5 text-slate-700 shrink-0" />;
     if (cat === 'natural_gas')
-      return <Flame className="w-4 h-4 text-amber-600 shrink-0" />;
-    return <Droplets className="w-4 h-4 text-cyan-600 shrink-0" />;
+      return <Flame className="w-3.5 h-3.5 text-amber-700 shrink-0" />;
+    return <Droplets className="w-3.5 h-3.5 text-cyan-700 shrink-0" />;
   };
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+    <div className="space-y-5 animate-fade-in">
+      {/* Section Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-slate-400">
+            Audit Ledger & Document Archive
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 mt-0.5">
+            <RevealText text="Utility Invoices & Meter Records" />
+          </h1>
+        </div>
+
+        {/* Legacy Excel Spreadsheet Ingestion Notice (Disabled for Testing Phase) */}
+        <div className="flex items-center gap-2.5 bg-slate-100/90 border border-slate-200/90 rounded-lg px-3 py-2">
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 cursor-not-allowed select-none"
+            title="Legacy Excel (.xlsx / .xls) workbook upload is disabled during the current testing phase"
+          >
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
+          </button>
+          <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
+            Testing Phase · Locked
+          </span>
+        </div>
+      </div>
+
+      {/* Filter & Actions Bar */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[240px]">
@@ -1975,8 +2595,8 @@ function InvoiceTable({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by invoice #, supplier, site name, or notes..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="Filter by invoice ref, date, supplier, site name, or PDF filename..."
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 transition-colors"
             />
           </div>
 
@@ -1992,8 +2612,8 @@ function InvoiceTable({
             <button
               type="button"
               onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
-              title="Download sample CSV template for bulk upload"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              title="Download CSV template"
             >
               <FileDown className="w-3.5 h-3.5" />
               CSV Template
@@ -2001,7 +2621,7 @@ function InvoiceTable({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
             >
               <Upload className="w-3.5 h-3.5" />
               Import CSV
@@ -2009,7 +2629,7 @@ function InvoiceTable({
             <button
               type="button"
               onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Export CSV ({filtered.length})
@@ -2017,29 +2637,31 @@ function InvoiceTable({
             <button
               type="button"
               onClick={onAddInvoice}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               Log Utility Invoice
             </button>
           </div>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 text-xs">
+        <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-500">Category:</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Stream:
+            </span>
             {[
               { id: 'all', label: 'All' },
               { id: 'electricity', label: 'Electricity (Scope 2)' },
-              { id: 'natural_gas', label: 'Natural Gas & Fuels (Scope 1)' },
+              { id: 'natural_gas', label: 'Natural Gas (Scope 1)' },
               { id: 'water', label: 'Water' },
             ].map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => setCategoryFilter(c.id)}
-                className={`px-2.5 py-1 rounded-md font-medium transition ${
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   categoryFilter === c.id
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -2051,7 +2673,9 @@ function InvoiceTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 ml-auto">
-            <span className="font-semibold text-slate-500">Site Name:</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Site:
+            </span>
             <select
               value={siteFilter}
               onChange={(e) => setSiteFilter(e.target.value)}
@@ -2065,7 +2689,9 @@ function InvoiceTable({
               ))}
             </select>
 
-            <span className="font-semibold text-slate-500 ml-1">Supplier:</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 ml-1">
+              Supplier:
+            </span>
             <select
               value={supplierFilter}
               onChange={(e) => setSupplierFilter(e.target.value)}
@@ -2079,8 +2705,8 @@ function InvoiceTable({
               ))}
             </select>
 
-            <span className="font-semibold text-slate-500 ml-1">
-              Reading Type:
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 ml-1">
+              Reading:
             </span>
             <select
               value={readingFilter}
@@ -2105,37 +2731,44 @@ function InvoiceTable({
       </div>
 
       {/* Invoices Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="py-3 px-4">Invoice & Period</th>
-                <th className="py-3 px-4">Site Name & Supplier</th>
-                <th className="py-3 px-4">Category & Scope</th>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-mono uppercase tracking-[0.1em] text-slate-500">
+                <th className="py-3 px-4">Invoice Ref & Tax Date</th>
+                <th className="py-3 px-4">Site Name & Provider</th>
+                <th className="py-3 px-4">Stream</th>
                 <th className="py-3 px-4 text-right">Usage</th>
-                <th className="py-3 px-4 text-right">GHG Emissions</th>
+                <th className="py-3 px-4 text-right">GHG (tCO₂e)</th>
                 <th className="py-3 px-4 text-right">Net (£)</th>
                 <th className="py-3 px-4 text-right">VAT (£)</th>
                 <th className="py-3 px-4 text-right">Gross (£ GBP)</th>
-                <th className="py-3 px-4">Reading Type</th>
+                <th className="py-3 px-4">Reading</th>
+                <th className="py-3 px-4">PDF Invoice</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-sm">
+            <tbody className="divide-y divide-slate-200/80 text-xs">
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={10}
-                    className="py-12 text-center text-slate-400 text-sm"
+                    colSpan={11}
+                    className="py-14 text-center text-slate-400 text-xs"
                   >
-                    <div>No utility invoices logged yet.</div>
+                    <div className="font-medium text-slate-600">
+                      No utility invoice records in the ledger
+                    </div>
+                    <p className="text-slate-400 mt-1">
+                      Log a utility invoice or import a verified CSV file to
+                      populate the ledger.
+                    </p>
                     <button
                       type="button"
                       onClick={onAddInvoice}
-                      className="mt-2 text-emerald-600 font-semibold hover:underline"
+                      className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
                     >
-                      + Log your first utility invoice
+                      + Log Utility Invoice
                     </button>
                   </td>
                 </tr>
@@ -2162,22 +2795,25 @@ function InvoiceTable({
                   return (
                     <tr
                       key={inv.id}
-                      className="hover:bg-slate-50/80 transition"
+                      className="hover:bg-slate-50/90 transition-colors"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">
+                        <div className="font-mono font-semibold text-slate-900">
                           {inv.invoiceNumber}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-[11px] font-mono text-slate-500">
+                          Issued: {inv.invoiceDate || inv.billingPeriodEnd}
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-400">
                           {inv.billingPeriodStart} → {inv.billingPeriodEnd}
                         </div>
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="font-medium text-slate-800">
+                        <div className="font-semibold text-slate-900">
                           {siteName}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-[11px] text-slate-500">
                           {inv.supplier}
                         </div>
                       </td>
@@ -2186,58 +2822,58 @@ function InvoiceTable({
                         <div className="flex items-center gap-2">
                           {getCategoryIcon(inv.category)}
                           <div>
-                            <div className="font-medium text-slate-800 text-xs">
+                            <div className="font-medium text-slate-800">
                               {catName}
                             </div>
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-[10px] font-mono uppercase text-slate-400">
                               {m.scope}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right font-mono tabular-nums">
                         <div className="font-semibold text-slate-900">
-                          {usageVal.toLocaleString()} {inv.unit}
+                          {usageVal.toLocaleString('en-GB')} {inv.unit}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[10px] text-slate-400">
                           {inv.category !== 'water'
                             ? `${(m.normalizedEnergyKwh / 1000).toFixed(2)} MWh`
                             : `${m.normalizedWaterM3.toFixed(1)} m³`}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right">
-                        <span className="font-bold text-emerald-700">
+                      <td className="py-3 px-4 text-right font-mono tabular-nums">
+                        <span className="font-semibold text-slate-900">
                           {m.co2eTonnes.toFixed(3)}
                         </span>{' '}
-                        <span className="text-xs text-slate-400">tCO₂e</span>
+                        <span className="text-[10px] text-slate-400">t</span>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-medium text-slate-700">
+                      <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-700">
                         £
-                        {netVal.toLocaleString(undefined, {
+                        {netVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </td>
 
-                      <td className="py-3 px-4 text-right">
-                        <div className="font-medium text-slate-700">
+                      <td className="py-3 px-4 text-right font-mono tabular-nums">
+                        <div className="text-slate-700">
                           £
-                          {vatAmtVal.toLocaleString(undefined, {
+                          {vatAmtVal.toLocaleString('en-GB', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                        <div className="text-[11px] text-slate-400">
+                        <div className="text-[10px] text-slate-400">
                           {vatRateVal}% VAT
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-bold text-slate-900">
+                      <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
                         £
-                        {grossVal.toLocaleString(undefined, {
+                        {grossVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -2245,14 +2881,32 @@ function InvoiceTable({
 
                       <td className="py-3 px-4">
                         {readingType === 'Actual' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
+                            <CheckCircle2 className="w-3 h-3 text-teal-600" />
                             Actual
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3 h-3" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
                             Estimated
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        {inv.pdfAttachment?.dataUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingPdfInvoice(inv)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-800 transition-colors"
+                            title={inv.pdfAttachment.name}
+                          >
+                            <FileText className="w-3 h-3 text-slate-600" />
+                            <span>View PDF</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] font-mono text-slate-300">
+                            —
                           </span>
                         )}
                       </td>
@@ -2262,26 +2916,26 @@ function InvoiceTable({
                           <button
                             type="button"
                             onClick={() => onEditInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md"
-                            title="Edit invoice"
+                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                            title="Amend record"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => onDuplicateInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md"
-                            title="Duplicate invoice for next billing cycle"
+                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                            title="Duplicate invoice"
                           >
-                            <Copy className="w-4 h-4" />
+                            <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => onDeleteInvoice(inv.id)}
-                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md"
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                             title="Delete invoice"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -2293,6 +2947,53 @@ function InvoiceTable({
           </table>
         </div>
       </div>
+
+      {/* Stored PDF Document Viewer Modal */}
+      {viewingPdfInvoice && viewingPdfInvoice.pdfAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 animate-fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-3.5 bg-slate-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="w-4 h-4 text-teal-400 shrink-0" />
+                <div className="truncate">
+                  <div className="text-xs font-semibold truncate">
+                    {viewingPdfInvoice.pdfAttachment.name}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400">
+                    Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
+                    {viewingPdfInvoice.siteName} ·{' '}
+                    {viewingPdfInvoice.supplier}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewingPdfInvoice.pdfAttachment.dataUrl}
+                  download={viewingPdfInvoice.pdfAttachment.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Download PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setViewingPdfInvoice(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-100">
+              <iframe
+                title={viewingPdfInvoice.pdfAttachment.name}
+                src={viewingPdfInvoice.pdfAttachment.dataUrl}
+                className="w-full h-full border-0"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2902,10 +3603,10 @@ function App() {
       nextInvoices = invoices.map((i) =>
         i.id === invoiceRecord.id ? invoiceRecord : i
       );
-      showToast(`Updated invoice ${invoiceRecord.invoiceNumber}`);
+      showToast(`Amended invoice ${invoiceRecord.invoiceNumber}`);
     } else {
       nextInvoices = [invoiceRecord, ...invoices];
-      showToast(`Added invoice ${invoiceRecord.invoiceNumber}`);
+      showToast(`Committed invoice ${invoiceRecord.invoiceNumber} to ledger`);
     }
     setInvoices(nextInvoices);
     setIsInvoiceModalOpen(false);
@@ -2917,7 +3618,7 @@ function App() {
     const target = invoices.find((i) => i.id === id);
     const nextInvoices = invoices.filter((i) => i.id !== id);
     setInvoices(nextInvoices);
-    showToast(`Deleted invoice ${target?.invoiceNumber || ''}`);
+    showToast(`Removed invoice ${target?.invoiceNumber || ''}`);
     triggerAutoSyncIfEnabled(nextInvoices, orgProfile);
   };
 
@@ -2939,41 +3640,37 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      {/* Top Navigation Header */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-          {/* Brand Logo */}
+    <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-900">
+      {/* Top Institutional Navigation Bar */}
+      <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Brand Identity */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-              <Leaf className="w-5 h-5" />
+            <div className="w-7 h-7 rounded bg-white text-slate-950 flex items-center justify-center font-mono font-bold text-xs tracking-tighter">
+              ESG
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-base tracking-tight">
-                  EcoLedger ESG
-                </span>
-                <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  UK Energy Tracker (£ GBP)
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Business Utility Invoice & ESG Emissions Tracker
-              </p>
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-semibold text-sm tracking-tight text-white">
+                UK Energy & Emissions Ledger
+              </span>
+              <span className="hidden sm:inline-block text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+                DEFRA · GBP (£)
+              </span>
             </div>
           </div>
 
           {/* Center Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+          <nav className="flex items-center gap-1">
             {[
               {
                 id: 'dashboard',
-                label: 'ESG Dashboard',
+                label: 'Overview',
                 icon: LayoutDashboard,
               },
               {
                 id: 'invoices',
-                label: `Utility Invoices (${invoices.length})`,
+                label: 'Utility Invoices',
+                badge: invoices.length,
                 icon: Receipt,
               },
             ].map((tab) => {
@@ -2984,38 +3681,49 @@ function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                  {tab.badge !== undefined && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                        active
+                          ? 'bg-slate-700 text-slate-200'
+                          : 'bg-slate-900 text-slate-400'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </nav>
 
           {/* Right Cloud Sync & Quick Add Actions */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
               title="Configure GitHub API or Google Sheets Sync"
             >
               {backendConfig.activeMode === 'github' ? (
-                <Github className="w-3.5 h-3.5 text-emerald-400" />
+                <Github className="w-3.5 h-3.5 text-teal-400" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                <Cloud className="w-3.5 h-3.5 text-teal-400" />
               )}
-              <span>
+              <span className="hidden sm:inline">
                 {backendConfig.activeMode === 'github'
                   ? 'GitHub Sync'
                   : backendConfig.activeMode === 'gsheets'
                   ? 'Sheets Sync'
-                  : 'Cloud Backend'}
+                  : 'Database Sync'}
               </span>
             </button>
 
@@ -3025,10 +3733,10 @@ function App() {
                 setEditingInvoice(null);
                 setIsInvoiceModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-950 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Log Utility Invoice
+              <Plus className="w-3.5 h-3.5" />
+              <span>Log Invoice</span>
             </button>
           </div>
         </div>
@@ -3036,12 +3744,12 @@ function App() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 no-print">
+        <div className="fixed bottom-5 right-5 z-50 no-print animate-fade-in">
           <div
-            className={`px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-lg shadow-xl border text-xs font-mono flex items-center gap-2 ${
               toast.type === 'error'
-                ? 'bg-red-900 text-white border-red-700'
-                : 'bg-slate-900 text-emerald-300 border-slate-700'
+                ? 'bg-red-950 text-red-200 border-red-800'
+                : 'bg-slate-950 text-teal-300 border-slate-800'
             }`}
           >
             <span>{toast.text}</span>
@@ -3050,7 +3758,7 @@ function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-7">
         {activeTab === 'dashboard' && (
           <DashboardView
             invoices={invoices}
@@ -3063,6 +3771,7 @@ function App() {
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
+            onSwitchTab={setActiveTab}
           />
         )}
 
@@ -3085,13 +3794,13 @@ function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print">
+      <footer className="bg-white border-t border-slate-200/90 py-3.5 px-6 text-[11px] text-slate-400 font-mono no-print">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div>
-            <strong>EcoLedger ESG</strong> · UK Business Utility & Emissions
-            Tracker (Head Office London · Office Sheffield · Office Leeds ·
-            Office Bristol)
+            UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · SHEFFIELD ·
+            LEEDS · BRISTOL
           </div>
+          <div>CURRENCY: GBP (£) · DEFRA CONVERSION STANDARD</div>
         </div>
       </footer>
 
@@ -3104,6 +3813,7 @@ function App() {
         }}
         onSave={handleSaveInvoice}
         editingInvoice={editingInvoice}
+        existingInvoices={invoices}
       />
 
       <BackendConfigModal

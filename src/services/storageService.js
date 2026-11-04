@@ -67,7 +67,11 @@ export function loadLocalState() {
 }
 
 export function saveLocalInvoices(invoices) {
-  localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  try {
+    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+  } catch (err) {
+    console.error('Storage quota warning:', err);
+  }
 }
 
 export function saveLocalOrgProfile(orgProfile) {
@@ -87,8 +91,12 @@ export function saveBackendConfig(backendConfig) {
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + chunkSize)
+    );
   }
   return btoa(binary);
 }
@@ -155,7 +163,7 @@ export async function pullFromGitHub(ghConfig) {
 }
 
 /**
- * GitHub API Integration — Commits JSON database directly to the repository
+ * GitHub API Integration — Commits JSON database (including PDF attachments) directly to repository
  */
 export async function pushToGitHub(ghConfig, payload) {
   const { owner, repo, branch = 'main', filePath, token } = ghConfig;
@@ -193,7 +201,7 @@ export async function pushToGitHub(ghConfig, payload) {
   }
 
   const enrichedPayload = {
-    schemaVersion: '2.0',
+    schemaVersion: '2.1',
     updatedAt: new Date().toISOString(),
     orgProfile: payload.orgProfile,
     invoices: payload.invoices.map((inv) => ({
@@ -204,7 +212,7 @@ export async function pushToGitHub(ghConfig, payload) {
 
   const jsonString = JSON.stringify(enrichedPayload, null, 2);
   const body = {
-    message: `chore(esg): sync ${payload.invoices.length} utility invoices via EcoLedger ESG Tracker`,
+    message: `chore(esg): sync ${payload.invoices.length} utility invoices via UK Energy Ledger`,
     content: utf8ToBase64(jsonString),
     branch: branch.trim(),
   };
@@ -286,6 +294,7 @@ export async function pushToGoogleSheets(gsConfig, payload) {
       normalizedEnergyKwh: Number(metrics.normalizedEnergyKwh.toFixed(2)),
       normalizedWaterM3: Number(metrics.normalizedWaterM3.toFixed(2)),
       co2eTonnes: Number(metrics.co2eTonnes.toFixed(4)),
+      pdfFileName: inv.pdfAttachment?.name || '',
     };
   });
 
@@ -345,19 +354,19 @@ function doPost(e) {
     tableSheet.clearContents();
     
     const headers = [
-      'Invoice #', 'Site Name', 'Supplier', 'Category', 'Scope',
+      'Invoice #', 'Invoice Date', 'Site Name', 'Supplier', 'Category', 'Scope',
       'Billing Start', 'Billing End', 'Usage', 'Unit',
       'Normalized Energy (kWh)', 'Water (m3)', 'CO2e (t)',
-      'Net (£)', 'VAT Rate (%)', 'VAT (£)', 'Gross (£)', 'Currency', 'Reading Type', 'Notes'
+      'Net (£)', 'VAT Rate (%)', 'VAT (£)', 'Gross (£)', 'Currency', 'Reading Type', 'PDF Document', 'Notes'
     ];
     tableSheet.appendRow(headers);
     
     (payload.invoices || []).forEach(inv => {
       tableSheet.appendRow([
-        inv.invoiceNumber, inv.siteName, inv.supplier, inv.category, inv.scope,
+        inv.invoiceNumber, inv.invoiceDate || '', inv.siteName, inv.supplier, inv.category, inv.scope,
         inv.billingPeriodStart, inv.billingPeriodEnd, inv.usage, inv.unit,
         inv.normalizedEnergyKwh, inv.normalizedWaterM3, inv.co2eTonnes,
-        inv.netCost, inv.vatRate, inv.vatAmount, inv.grossCost, 'GBP', inv.readingType, inv.notes || ''
+        inv.netCost, inv.vatRate, inv.vatAmount, inv.grossCost, 'GBP', inv.readingType, inv.pdfFileName || '', inv.notes || ''
       ]);
     });
     
@@ -376,6 +385,7 @@ export function exportInvoicesToCsv(invoices) {
   const headers = [
     'Invoice ID',
     'Invoice Number',
+    'Invoice Date',
     'Site Name',
     'Supplier',
     'Category',
@@ -393,6 +403,7 @@ export function exportInvoicesToCsv(invoices) {
     'Gross Cost (GBP)',
     'Currency',
     'Reading Type',
+    'PDF Document Attached',
     'Notes',
   ];
 
@@ -421,6 +432,7 @@ export function exportInvoicesToCsv(invoices) {
     return [
       inv.id,
       inv.invoiceNumber,
+      inv.invoiceDate || '',
       inv.siteName || inv.facility || SITES[0],
       inv.supplier || SUPPLIERS[0],
       catName,
@@ -438,6 +450,7 @@ export function exportInvoicesToCsv(invoices) {
       grossVal.toFixed(2),
       'GBP',
       inv.readingType || 'Actual',
+      inv.pdfAttachment?.name || 'None',
       inv.notes || '',
     ]
       .map(escapeCsv)
@@ -490,6 +503,7 @@ export function parseCsvToInvoices(csvText) {
     headers.findIndex((h) => candidates.some((c) => h.includes(c)));
 
   const idxInvNum = findCol(['invoice number', 'invoice #', 'invoice_number']);
+  const idxInvDate = findCol(['invoice date', 'issue date', 'date']);
   const idxSite = findCol(['site name', 'site', 'facility', 'location']);
   const idxSupplier = findCol(['supplier', 'provider', 'utility']);
   const idxCategory = findCol(['category', 'type', 'utility type']);
@@ -535,14 +549,17 @@ export function parseCsvToInvoices(csvText) {
     const rawReading = (idxReading >= 0 ? cols[idxReading] : '').toLowerCase();
     const readingType = rawReading.includes('est') ? 'Estimated' : 'Actual';
 
+    const endDate = (idxEnd >= 0 && cols[idxEnd]) || '2026-01-31';
+
     imported.push({
       id: `inv-csv-${Date.now()}-${i}`,
       invoiceNumber: (idxInvNum >= 0 && cols[idxInvNum]) || `INV-${1000 + i}`,
+      invoiceDate: (idxInvDate >= 0 && cols[idxInvDate]) || endDate,
       siteName: (idxSite >= 0 && cols[idxSite]) || SITES[0],
       supplier: (idxSupplier >= 0 && cols[idxSupplier]) || SUPPLIERS[0],
       category,
       billingPeriodStart: (idxStart >= 0 && cols[idxStart]) || '2026-01-01',
-      billingPeriodEnd: (idxEnd >= 0 && cols[idxEnd]) || '2026-01-31',
+      billingPeriodEnd: endDate,
       usage: Number(idxUsage >= 0 ? cols[idxUsage] : 0) || 0,
       unit: (idxUnit >= 0 && cols[idxUnit]) || defaultUnit,
       netCost,
@@ -552,6 +569,7 @@ export function parseCsvToInvoices(csvText) {
       currency: 'GBP',
       readingType,
       notes: (idxNotes >= 0 && cols[idxNotes]) || '',
+      pdfAttachment: null,
     });
   }
 

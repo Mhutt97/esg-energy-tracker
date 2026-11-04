@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Leaf,
   LayoutDashboard,
   Receipt,
   Cloud,
@@ -89,10 +88,10 @@ export default function App() {
       nextInvoices = invoices.map((i) =>
         i.id === invoiceRecord.id ? invoiceRecord : i
       );
-      showToast(`Updated invoice ${invoiceRecord.invoiceNumber}`);
+      showToast(`Amended invoice ${invoiceRecord.invoiceNumber}`);
     } else {
       nextInvoices = [invoiceRecord, ...invoices];
-      showToast(`Added invoice ${invoiceRecord.invoiceNumber}`);
+      showToast(`Committed invoice ${invoiceRecord.invoiceNumber} to ledger`);
     }
     setInvoices(nextInvoices);
     setIsInvoiceModalOpen(false);
@@ -104,7 +103,7 @@ export default function App() {
     const target = invoices.find((i) => i.id === id);
     const nextInvoices = invoices.filter((i) => i.id !== id);
     setInvoices(nextInvoices);
-    showToast(`Deleted invoice ${target?.invoiceNumber || ''}`);
+    showToast(`Removed invoice ${target?.invoiceNumber || ''}`);
     triggerAutoSyncIfEnabled(nextInvoices, orgProfile);
   };
 
@@ -126,41 +125,37 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      {/* Top Navigation Header */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-          {/* Brand Logo */}
+    <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-900">
+      {/* Top Institutional Navigation Bar */}
+      <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+          {/* Brand Identity */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-              <Leaf className="w-5 h-5" />
+            <div className="w-7 h-7 rounded bg-white text-slate-950 flex items-center justify-center font-mono font-bold text-xs tracking-tighter">
+              ESG
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-base tracking-tight">
-                  EcoLedger ESG
-                </span>
-                <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  UK Energy Tracker (£ GBP)
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Business Utility Invoice & ESG Emissions Tracker
-              </p>
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-semibold text-sm tracking-tight text-white">
+                UK Energy & Emissions Ledger
+              </span>
+              <span className="hidden sm:inline-block text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+                DEFRA · GBP (£)
+              </span>
             </div>
           </div>
 
           {/* Center Navigation Tabs */}
-          <nav className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+          <nav className="flex items-center gap-1">
             {[
               {
                 id: 'dashboard',
-                label: 'ESG Dashboard',
+                label: 'Overview',
                 icon: LayoutDashboard,
               },
               {
                 id: 'invoices',
-                label: `Utility Invoices (${invoices.length})`,
+                label: 'Utility Invoices',
+                badge: invoices.length,
                 icon: Receipt,
               },
             ].map((tab) => {
@@ -171,38 +166,49 @@ export default function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                  {tab.badge !== undefined && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                        active
+                          ? 'bg-slate-700 text-slate-200'
+                          : 'bg-slate-900 text-slate-400'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </nav>
 
           {/* Right Cloud Sync & Quick Add Actions */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
               title="Configure GitHub API or Google Sheets Sync"
             >
               {backendConfig.activeMode === 'github' ? (
-                <Github className="w-3.5 h-3.5 text-emerald-400" />
+                <Github className="w-3.5 h-3.5 text-teal-400" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+                <Cloud className="w-3.5 h-3.5 text-teal-400" />
               )}
-              <span>
+              <span className="hidden sm:inline">
                 {backendConfig.activeMode === 'github'
                   ? 'GitHub Sync'
                   : backendConfig.activeMode === 'gsheets'
                   ? 'Sheets Sync'
-                  : 'Cloud Backend'}
+                  : 'Database Sync'}
               </span>
             </button>
 
@@ -212,10 +218,10 @@ export default function App() {
                 setEditingInvoice(null);
                 setIsInvoiceModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-950 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Log Utility Invoice
+              <Plus className="w-3.5 h-3.5" />
+              <span>Log Invoice</span>
             </button>
           </div>
         </div>
@@ -223,12 +229,12 @@ export default function App() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 no-print">
+        <div className="fixed bottom-5 right-5 z-50 no-print animate-fade-in">
           <div
-            className={`px-4 py-3 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-lg shadow-xl border text-xs font-mono flex items-center gap-2 ${
               toast.type === 'error'
-                ? 'bg-red-900 text-white border-red-700'
-                : 'bg-slate-900 text-emerald-300 border-slate-700'
+                ? 'bg-red-950 text-red-200 border-red-800'
+                : 'bg-slate-950 text-teal-300 border-slate-800'
             }`}
           >
             <span>{toast.text}</span>
@@ -237,7 +243,7 @@ export default function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-7">
         {activeTab === 'dashboard' && (
           <DashboardView
             invoices={invoices}
@@ -250,6 +256,7 @@ export default function App() {
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
+            onSwitchTab={setActiveTab}
           />
         )}
 
@@ -272,13 +279,13 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 px-6 text-xs text-slate-500 no-print">
+      <footer className="bg-white border-t border-slate-200/90 py-3.5 px-6 text-[11px] text-slate-400 font-mono no-print">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div>
-            <strong>EcoLedger ESG</strong> · UK Business Utility & Emissions
-            Tracker (Head Office London · Office Sheffield · Office Leeds ·
-            Office Bristol)
+            UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · SHEFFIELD ·
+            LEEDS · BRISTOL
           </div>
+          <div>CURRENCY: GBP (£) · DEFRA CONVERSION STANDARD</div>
         </div>
       </footer>
 
@@ -291,6 +298,7 @@ export default function App() {
         }}
         onSave={handleSaveInvoice}
         editingInvoice={editingInvoice}
+        existingInvoices={invoices}
       />
 
       <BackendConfigModal

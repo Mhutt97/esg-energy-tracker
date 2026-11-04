@@ -1,16 +1,14 @@
 import React, { useMemo } from 'react';
 import {
-  Zap,
-  Flame,
-  Droplets,
   Building2,
-  Leaf,
-  PoundSterling,
   Plus,
   CheckCircle2,
   AlertCircle,
+  Lock,
+  ArrowUpRight,
 } from 'lucide-react';
 import { calculateInvoiceEsgMetrics, SITES } from '../data/emissionFactors.js';
+import { AnimatedNumber, RevealText } from './AnimatedText.jsx';
 
 export default function DashboardView({
   invoices,
@@ -20,6 +18,7 @@ export default function DashboardView({
   selectedYear,
   onSelectYear,
   onOpenNewInvoice,
+  onSwitchTab,
 }) {
   const siteOptions = ['All Sites', ...SITES];
 
@@ -58,6 +57,7 @@ export default function DashboardView({
     let totalVat = 0;
     let totalGross = 0;
     let actualReadingCount = 0;
+    let pdfAttachedCount = 0;
 
     const monthlyMap = {};
     const siteMap = {};
@@ -91,6 +91,9 @@ export default function DashboardView({
 
       if ((inv.readingType || 'Actual') === 'Actual') {
         actualReadingCount++;
+      }
+      if (inv.pdfAttachment?.dataUrl) {
+        pdfAttachedCount++;
       }
 
       if (inv.category === 'electricity') {
@@ -172,6 +175,7 @@ export default function DashboardView({
       totalVat,
       totalGross,
       actualReadingCount,
+      pdfAttachedCount,
       monthlySeries,
       siteSeries,
     };
@@ -183,19 +187,28 @@ export default function DashboardView({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Top Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-500" />
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Site Name:
-            </label>
+    <div className="space-y-6 animate-fade-in">
+      {/* Editorial Page Header & Filter Bar */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-slate-400">
+            UK Commercial Utility & Emissions Overview
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mt-0.5">
+            <RevealText text="Energy & ESG Performance Ledger" />
+          </h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
+            <Building2 className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Site:
+            </span>
             <select
               value={selectedSite}
               onChange={(e) => onSelectSite(e.target.value)}
-              className="text-sm font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="text-xs font-semibold bg-transparent text-slate-800 focus:outline-none"
             >
               {siteOptions.map((s) => (
                 <option key={s} value={s}>
@@ -205,14 +218,14 @@ export default function DashboardView({
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Reporting Year:
-            </label>
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 shadow-2xs">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+              Period:
+            </span>
             <select
               value={selectedYear}
               onChange={(e) => onSelectYear(e.target.value)}
-              className="text-sm font-medium bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="text-xs font-semibold bg-transparent text-slate-800 focus:outline-none"
             >
               {years.map((y) => (
                 <option key={y} value={y}>
@@ -221,239 +234,251 @@ export default function DashboardView({
               ))}
             </select>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onOpenNewInvoice}
-          className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <Plus className="w-4 h-4" />
-          Log Utility Invoice
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-400 text-xs font-medium px-3 py-2 rounded-lg cursor-not-allowed select-none"
+            title="Legacy Excel (.xlsx) workbook ingestion is locked during the testing phase"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Upload Excel (.xlsx)</span>
+            <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded">
+              Testing
+            </span>
+          </button>
 
-      {/* Primary ESG KPI Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Card 1: Total GHG Footprint */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
-                Total Carbon Footprint
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.totalGhgTonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Calculated using UK DEFRA emission factors
-              </p>
-            </div>
-            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Leaf className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Scope 2 Electricity */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
-                Scope 2 · Electricity
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.scope2Tonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.electricityKwh.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}{' '}
-                kWh ({(summary.electricityKwh / 1000).toFixed(2)} MWh)
-              </p>
-            </div>
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-              <Zap className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Scope 1 Natural Gas & Fuels */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full">
-                Scope 1 · Natural Gas & Fuels
-              </span>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {summary.scope1Tonnes.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">
-                  tCO₂e
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.fuelKwhEq.toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}{' '}
-                kWh-eq ({(summary.fuelKwhEq / 1000).toFixed(2)} MWh)
-              </p>
-            </div>
-            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-              <Flame className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Total Energy Consumption */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Energy Consumption
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  {summary.totalEnergyMwh.toFixed(2)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">MWh</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Combined Electricity + Natural Gas usage
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 5: Water & Wastewater */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-cyan-700">
-                Water & Wastewater
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  {summary.waterM3.toFixed(1)}
-                </span>
-                <span className="text-sm font-medium text-slate-500">m³</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {summary.waterTonnes.toFixed(3)} tCO₂e embodied emissions
-              </p>
-            </div>
-            <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg">
-              <Droplets className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 6: Total Utility Spend (£ GBP Net, VAT & Gross) */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Utility Spend (£ GBP)
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900">
-                  £
-                  {summary.totalGross.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  Gross ({filteredInvoices.length} invoices)
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Net: £
-                {summary.totalNet.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{' '}
-                · VAT: £
-                {summary.totalVat.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-              <p className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
-                {filteredInvoices.length > 0 &&
-                summary.actualReadingCount === filteredInvoices.length ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>100% Actual Meter Readings</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                    <span>
-                      {summary.actualReadingCount} of {filteredInvoices.length}{' '}
-                      Actual readings
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="p-2 bg-slate-100 text-slate-700 rounded-lg">
-              <PoundSterling className="w-5 h-5" />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenNewInvoice}
+            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-2xs transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Log Utility Invoice
+          </button>
         </div>
       </div>
 
-      {/* Charts & Site Breakdown Row */}
+      {/* Architectural Hairline Metric Grid */}
+      <div className="bg-slate-200/90 border border-slate-200/90 rounded-xl overflow-hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[1px] shadow-2xs">
+        {/* Metric 1: Total GHG Footprint */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              01 / Total Carbon Footprint
+            </span>
+            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+              UK DEFRA
+            </span>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalGhgTonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Combined Scope 1, Scope 2 & Water</span>
+            <span className="font-mono text-slate-700">
+              {filteredInvoices.length} records
+            </span>
+          </div>
+        </div>
+
+        {/* Metric 2: Scope 2 Electricity */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              02 / Scope 2 · Electricity
+            </span>
+            <span className="w-2 h-2 rounded-full bg-slate-900" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.scope2Tonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>
+              <AnimatedNumber
+                value={summary.electricityKwh}
+                decimals={0}
+                suffix=" kWh"
+              />
+            </span>
+            <span>{(summary.electricityKwh / 1000).toFixed(2)} MWh</span>
+          </div>
+        </div>
+
+        {/* Metric 3: Scope 1 Natural Gas */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              03 / Scope 1 · Natural Gas & Fuels
+            </span>
+            <span className="w-2 h-2 rounded-full bg-amber-600" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.scope1Tonnes}
+              decimals={2}
+              className="text-3xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">tCO₂e</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>
+              <AnimatedNumber
+                value={summary.fuelKwhEq}
+                decimals={0}
+                suffix=" kWh-eq"
+              />
+            </span>
+            <span>{(summary.fuelKwhEq / 1000).toFixed(2)} MWh</span>
+          </div>
+        </div>
+
+        {/* Metric 4: Total Energy Consumption */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              04 / Total Energy Input
+            </span>
+            <span className="text-[10px] font-mono text-slate-400">
+              MWh Equivalent
+            </span>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalEnergyMwh}
+              decimals={2}
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">MWh</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+            Normalized across Electricity & Stationary Fuels
+          </div>
+        </div>
+
+        {/* Metric 5: Water & Wastewater */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              05 / Water & Wastewater
+            </span>
+            <span className="w-2 h-2 rounded-full bg-cyan-600" />
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.waterM3}
+              decimals={1}
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-xs font-mono text-slate-500">m³</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>Embodied Emissions:</span>
+            <span>{summary.waterTonnes.toFixed(3)} tCO₂e</span>
+          </div>
+        </div>
+
+        {/* Metric 6: Financial Settlement (£ GBP Net, VAT & Gross) */}
+        <div className="bg-white p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-slate-500">
+              06 / Financial Expenditure (£ GBP)
+            </span>
+            {filteredInvoices.length > 0 &&
+            summary.actualReadingCount === filteredInvoices.length ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
+                <CheckCircle2 className="w-3 h-3" />
+                100% Actual
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-500">
+                {summary.actualReadingCount}/{filteredInvoices.length} Actual
+              </span>
+            )}
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <AnimatedNumber
+              value={summary.totalGross}
+              decimals={2}
+              prefix="£"
+              className="text-2xl font-mono font-semibold tracking-tight text-slate-900"
+            />
+            <span className="text-[11px] font-mono text-slate-400">Gross</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+            <span>
+              Net: £
+              {summary.totalNet.toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span>
+              VAT: £
+              {summary.totalVat.toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts & UK Site Allocation Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly GHG Emissions Stacked Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-slate-400">
+                  Temporal Trajectory
+                </div>
+                <h3 className="text-sm font-semibold text-slate-900 mt-0.5">
                   Monthly GHG Emissions Profile (tCO₂e)
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Stacked Scope 1 (Natural Gas) + Scope 2 (Electricity) + Water
-                </p>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block" />
-                  Scope 1 (Gas)
+              <div className="flex items-center gap-4 text-[11px] font-mono text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-amber-600 inline-block" />
+                  Scope 1
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-blue-600 inline-block" />
-                  Scope 2 (Electricity)
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-slate-900 inline-block" />
+                  Scope 2
                 </span>
-                <span className="flex items-center gap-1.5 text-slate-600">
-                  <span className="w-3 h-3 rounded-sm bg-cyan-500 inline-block" />
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-xs bg-cyan-600 inline-block" />
                   Water
                 </span>
               </div>
             </div>
 
             {summary.monthlySeries.length === 0 ? (
-              <div className="h-60 flex flex-col items-center justify-center text-slate-400 text-sm border border-dashed border-slate-200 rounded-lg">
-                <p>No utility invoices logged yet.</p>
+              <div className="h-60 mt-4 flex flex-col items-center justify-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-lg bg-slate-50/40">
+                <p className="font-medium text-slate-600">
+                  No utility invoices logged in the ledger
+                </p>
+                <p className="text-slate-400 mt-0.5">
+                  Add an invoice for Head Office London, Sheffield, Leeds, or
+                  Bristol to generate analytics.
+                </p>
                 <button
                   type="button"
                   onClick={onOpenNewInvoice}
-                  className="mt-2 text-emerald-600 font-semibold hover:underline"
+                  className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
                 >
-                  + Log your first utility invoice
+                  + Log Utility Invoice
                 </button>
               </div>
             ) : (
@@ -473,33 +498,33 @@ export default function DashboardView({
                       key={item.month}
                       className="flex-1 flex flex-col items-center h-full justify-end group"
                     >
-                      <div className="text-[11px] font-semibold text-slate-600 mb-1.5">
+                      <div className="text-[10px] font-mono font-semibold text-slate-600 mb-1.5 tabular-nums">
                         {total.toFixed(2)}t
                       </div>
-                      <div className="w-full max-w-[54px] flex flex-col-reverse rounded-t-md overflow-hidden bg-slate-100 h-44 justify-start">
+                      <div className="w-full max-w-[48px] flex flex-col-reverse rounded-t overflow-hidden bg-slate-100 h-44 justify-start">
                         {s1 > 0 && (
                           <div
                             style={{ height: `${Math.max(4, s1Pct)}%` }}
-                            className="bg-amber-500 transition-all"
-                            title={`Scope 1: ${s1.toFixed(2)} tCO₂e`}
+                            className="bg-amber-600 transition-all duration-500"
+                            title={`Scope 1: ${s1.toFixed(3)} tCO₂e`}
                           />
                         )}
                         {s2 > 0 && (
                           <div
                             style={{ height: `${Math.max(4, s2Pct)}%` }}
-                            className="bg-blue-600 transition-all"
-                            title={`Scope 2: ${s2.toFixed(2)} tCO₂e`}
+                            className="bg-slate-900 transition-all duration-500"
+                            title={`Scope 2: ${s2.toFixed(3)} tCO₂e`}
                           />
                         )}
                         {w > 0 && (
                           <div
                             style={{ height: `${Math.max(2, wPct)}%` }}
-                            className="bg-cyan-500 transition-all"
+                            className="bg-cyan-600 transition-all duration-500"
                             title={`Water: ${w.toFixed(3)} tCO₂e`}
                           />
                         )}
                       </div>
-                      <span className="mt-2 text-xs font-medium text-slate-600">
+                      <span className="mt-2 text-[11px] font-mono text-slate-500">
                         {item.month}
                       </span>
                     </div>
@@ -509,23 +534,34 @@ export default function DashboardView({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Suppliers supported: EDF, SSE, EON, Octopus</span>
-            <span>Currency: £ GBP (Net, VAT & Gross)</span>
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span className="font-mono">
+              Approved Providers: EDF · SSE · EON · Octopus
+            </span>
+            <button
+              type="button"
+              onClick={() => onSwitchTab && onSwitchTab('invoices')}
+              className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:underline"
+            >
+              <span>Open Full Invoice Ledger</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Site Breakdown Panel */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
+        {/* UK Site Breakdown Panel */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-2xs flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
-              Emissions by Site Name
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              UK office energy & GHG breakdown
-            </p>
+            <div className="pb-4 border-b border-slate-100">
+              <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-slate-400">
+                Regional Allocation
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900 mt-0.5">
+                Emissions by Site Name
+              </h3>
+            </div>
 
-            <div className="space-y-3">
+            <div className="mt-4 divide-y divide-slate-100">
               {summary.siteSeries.map((site) => {
                 const siteTotal = site.scope1 + site.scope2 + site.waterTonnes;
                 const sharePct =
@@ -534,29 +570,28 @@ export default function DashboardView({
                     : 0;
 
                 return (
-                  <div
-                    key={site.siteName}
-                    className="p-3 rounded-lg bg-slate-50 border border-slate-200/80"
-                  >
-                    <div className="flex items-center justify-between text-sm font-semibold text-slate-800">
-                      <span className="truncate">{site.siteName}</span>
-                      <span className="text-emerald-700">
+                  <div key={site.siteName} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-900">
+                        {site.siteName}
+                      </span>
+                      <span className="font-mono font-semibold text-slate-900 tabular-nums">
                         {siteTotal.toFixed(2)} tCO₂e
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                    <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-slate-400 tabular-nums">
                       <span>
                         {site.energyMwh.toFixed(2)} MWh · £
-                        {site.grossCost.toLocaleString(undefined, {
+                        {site.grossCost.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </span>
-                      <span>{site.invoiceCount} invoices</span>
+                      <span>{site.invoiceCount} records</span>
                     </div>
-                    <div className="mt-2 w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="mt-2 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-emerald-600 rounded-full"
+                        className="h-full bg-slate-900 rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, sharePct)}%` }}
                       />
                     </div>
@@ -566,9 +601,11 @@ export default function DashboardView({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
-            Click <strong>Utility Invoices</strong> above to view, edit, or
-            bulk-import bills.
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span>PDF Invoices Stored in DB:</span>
+            <span className="text-slate-700 font-semibold">
+              {summary.pdfAttachedCount} / {filteredInvoices.length}
+            </span>
           </div>
         </div>
       </div>
