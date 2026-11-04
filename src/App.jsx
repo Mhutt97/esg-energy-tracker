@@ -5,6 +5,7 @@ import {
   Cloud,
   Plus,
   Github,
+  UploadCloud,
 } from 'lucide-react';
 import DashboardView from './components/DashboardView.jsx';
 import InvoiceTable from './components/InvoiceTable.jsx';
@@ -13,11 +14,14 @@ import BackendConfigModal from './components/BackendConfigModal.jsx';
 import {
   loadLocalState,
   loadInvoicesFromIndexedDb,
+  fetchSharedRepositoryDatabase,
+  mergeRemoteAndLocalInvoices,
   saveLocalInvoices,
   saveLocalOrgProfile,
   saveBackendConfig,
   pushToGitHub,
   pushToGoogleSheets,
+  pullFromGoogleSheets,
 } from './services/storageService.js';
 
 export default function App() {
@@ -28,6 +32,7 @@ export default function App() {
   const [backendConfig, setBackendConfig] = useState(
     initialState.backendConfig
   );
+  const [hasUnsyncedLocal, setHasUnsyncedLocal] = useState(false);
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedSite, setSelectedSite] = useState('All Sites');
@@ -41,14 +46,82 @@ export default function App() {
   const syncQueueRef = useRef(Promise.resolve());
   const toastTimerRef = useRef(null);
 
-  // Hydrate full records (including large PDF attachments) from IndexedDB on startup
+  const showToast = (text, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ text, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200);
+  };
+
+  // On startup: Hydrate local IndexedDB AND automatically fetch shared database from GitHub Repo / Google Sheets
+  // so every user accessing the website sees the shared invoice data automatically!
   useEffect(() => {
     let isMounted = true;
-    loadInvoicesFromIndexedDb().then((idbInvoices) => {
-      if (isMounted && Array.isArray(idbInvoices) && idbInvoices.length > 0) {
-        setInvoices(idbInvoices);
+
+    async function bootstrapMultiUserDatabase() {
+      const localIdb =
+        (await loadInvoicesFromIndexedDb()) || initialState.invoices || [];
+
+      const remoteRepoData = await fetchSharedRepositoryDatabase(
+        initialState.backendConfig.github
+      );
+
+      let remoteInvoices = remoteRepoData?.invoices || [];
+      let activeSheetsUrl =
+        initialState.backendConfig.gsheets?.webAppUrl ||
+        remoteRepoData?.sharedGsheetsUrl ||
+        '';
+
+      // If a shared Google Sheets Web App URL is configured (either locally or inside data/esg-invoices.json),
+      // pull the live multi-user rows from Google Sheets as well
+      if (activeSheetsUrl) {
+        try {
+          const sheetData = await pullFromGoogleSheets({
+            webAppUrl: activeSheetsUrl,
+          });
+          if (
+            Array.isArray(sheetData.invoices) &&
+            sheetData.invoices.length > 0
+          ) {
+            remoteInvoices = mergeRemoteAndLocalInvoices(
+              sheetData.invoices,
+              remoteInvoices
+            );
+          }
+          if (
+            isMounted &&
+            !initialState.backendConfig.gsheets?.webAppUrl &&
+            remoteRepoData?.sharedGsheetsUrl
+          ) {
+            setBackendConfig((prev) => ({
+              ...prev,
+              activeMode: 'gsheets',
+              gsheets: {
+                ...prev.gsheets,
+                webAppUrl: remoteRepoData.sharedGsheetsUrl,
+              },
+            }));
+          }
+        } catch (err) {
+          console.warn('Shared Google Sheet fetch skipped:', err);
+        }
       }
-    });
+
+      if (!isMounted) return;
+
+      const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
+      setInvoices(merged);
+
+      if (remoteRepoData?.orgProfile) {
+        setOrgProfile((prev) => ({ ...prev, ...remoteRepoData.orgProfile }));
+      }
+
+      // Check if local browser has invoices that are not yet published in the shared repository
+      if (localIdb.length > remoteInvoices.length) {
+        setHasUnsyncedLocal(true);
+      }
+    }
+
+    bootstrapMultiUserDatabase();
     return () => {
       isMounted = false;
     };
@@ -66,48 +139,50 @@ export default function App() {
     saveBackendConfig(backendConfig);
   }, [backendConfig]);
 
-  const showToast = (text, type = 'success') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ text, type });
-    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
-  };
-
-  // Serialized cloud sync queue to prevent concurrent SHA race conditions on GitHub API
+  // Serialized cloud sync queue to publish changes for all website visitors
   const triggerAutoSyncIfEnabled = (nextInvoices, nextProfile) => {
-    if (!backendConfig.autoSync) return;
+    const hasGithubToken = Boolean(backendConfig.github?.token?.trim());
+    const hasSheetsUrl = Boolean(backendConfig.gsheets?.webAppUrl?.trim());
+
+    if (!hasGithubToken && !hasSheetsUrl) {
+      setHasUnsyncedLocal(true);
+      showToast(
+        'Saved in this browser. Click "Publish for All Users" in the top bar to sync to the shared repo.',
+        'info'
+      );
+      return;
+    }
+
+    if (!backendConfig.autoSync) {
+      setHasUnsyncedLocal(true);
+      return;
+    }
 
     syncQueueRef.current = syncQueueRef.current
       .then(async () => {
-        if (
-          backendConfig.activeMode === 'github' &&
-          backendConfig.github?.token
-        ) {
+        if (hasGithubToken) {
           await pushToGitHub(backendConfig.github, {
             invoices: nextInvoices,
             orgProfile: nextProfile,
+            sharedGsheetsUrl: backendConfig.gsheets?.webAppUrl || '',
           });
-          setBackendConfig((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-          }));
-          showToast('Auto-synced invoices to GitHub repository');
-        } else if (
-          backendConfig.activeMode === 'gsheets' &&
-          backendConfig.gsheets?.webAppUrl
-        ) {
+        }
+        if (hasSheetsUrl) {
           await pushToGoogleSheets(backendConfig.gsheets, {
             invoices: nextInvoices,
             orgProfile: nextProfile,
           });
-          setBackendConfig((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-          }));
-          showToast('Auto-synced invoices to Google Sheets');
         }
+        setHasUnsyncedLocal(false);
+        setBackendConfig((prev) => ({
+          ...prev,
+          lastSyncedAt: new Date().toISOString(),
+        }));
+        showToast('Published invoice update to shared cloud database');
       })
       .catch((err) => {
-        showToast(`Cloud auto-sync failed: ${err.message}`, 'error');
+        setHasUnsyncedLocal(true);
+        showToast(`Shared cloud sync failed: ${err.message}`, 'error');
       });
   };
 
@@ -274,20 +349,26 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-colors"
-              title="Configure GitHub API or Google Sheets Sync"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                hasUnsyncedLocal
+                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-400/50'
+                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
+              }`}
+              title="Configure GitHub API or Google Sheets Sync so all website visitors see your invoices"
             >
-              {backendConfig.activeMode === 'github' ? (
+              {hasUnsyncedLocal ? (
+                <UploadCloud className="w-3.5 h-3.5 text-amber-300" />
+              ) : backendConfig.activeMode === 'github' ? (
                 <Github className="w-3.5 h-3.5 text-sky-400" />
               ) : (
                 <Cloud className="w-3.5 h-3.5 text-sky-400" />
               )}
               <span className="hidden sm:inline">
-                {backendConfig.activeMode === 'github'
-                  ? 'GitHub Sync'
-                  : backendConfig.activeMode === 'gsheets'
-                  ? 'Sheets Sync'
-                  : 'Database Sync'}
+                {hasUnsyncedLocal
+                  ? 'Publish for All Users'
+                  : backendConfig.activeMode === 'github'
+                  ? 'Shared Repo Sync'
+                  : 'Sheets Sync'}
               </span>
             </button>
 
@@ -310,6 +391,28 @@ export default function App() {
         </div>
       </header>
 
+      {/* Unsynced Local Changes Banner (if user logged invoices locally without configuring cloud token/sheet yet) */}
+      {hasUnsyncedLocal && (
+        <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2.5 text-xs text-amber-950 no-print">
+          <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="font-semibold">
+              <strong>Local Browser Changes Detected:</strong> You have logged
+              invoices in this browser that haven&apos;t been published to the
+              shared repository yet. Other users visiting the website will only
+              see invoices once they are committed to{' '}
+              <code>data/esg-invoices.json</code> or synced to Google Sheets.
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsBackendModalOpen(true)}
+              className="px-3 py-1 rounded-lg bg-amber-900 hover:bg-amber-800 text-white font-bold text-xs shrink-0"
+            >
+              Publish to Shared Database →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 no-print animate-fade-in">
@@ -317,6 +420,8 @@ export default function App() {
             className={`px-4 py-2.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 ${
               toast.type === 'error'
                 ? 'bg-rose-950 text-rose-200 border-rose-800'
+                : toast.type === 'info'
+                ? 'bg-amber-950 text-amber-200 border-amber-800'
                 : 'bg-slate-950 text-sky-300 border-slate-800'
             }`}
           >
@@ -388,11 +493,17 @@ export default function App() {
         isOpen={isBackendModalOpen}
         onClose={() => setIsBackendModalOpen(false)}
         backendConfig={backendConfig}
-        onSaveConfig={setBackendConfig}
+        onSaveConfig={(nextCfg) => {
+          setBackendConfig(nextCfg);
+          if (nextCfg.lastSyncedAt) {
+            setHasUnsyncedLocal(false);
+          }
+        }}
         invoices={invoices}
         orgProfile={orgProfile}
         onRestoreRemoteData={(remoteInvoices, remoteProfile) => {
           setInvoices(remoteInvoices);
+          setHasUnsyncedLocal(false);
           if (remoteProfile) {
             setOrgProfile((prev) => ({ ...prev, ...remoteProfile }));
           }

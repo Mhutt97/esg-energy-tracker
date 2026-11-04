@@ -25,8 +25,8 @@ const IDB_CONFIG = {
 };
 
 export const DEFAULT_BACKEND_CONFIG = {
-  activeMode: 'local', // 'local' | 'github' | 'gsheets'
-  autoSync: false,
+  activeMode: 'github', // Default to GitHub shared repo mode
+  autoSync: true, // Auto-sync enabled by default so saves publish for all users
   lastSyncedAt: null,
   github: {
     owner: 'Mhutt97',
@@ -137,6 +137,8 @@ export function loadLocalState() {
       backendConfig: {
         ...DEFAULT_BACKEND_CONFIG,
         ...parsedBackend,
+        autoSync:
+          parsedBackend.autoSync !== undefined ? parsedBackend.autoSync : true,
         github: {
           ...DEFAULT_BACKEND_CONFIG.github,
           ...(parsedBackend.github || {}),
@@ -158,14 +160,11 @@ export function loadLocalState() {
 }
 
 export function saveLocalInvoices(invoices) {
-  // Always persist full records (including PDFs) to IndexedDB asynchronously
   saveInvoicesToIndexedDb(invoices);
 
   try {
     localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
   } catch (err) {
-    // If localStorage hits the 5 MB browser quota due to multiple PDF attachments,
-    // store lightweight invoice records in localStorage while IndexedDB retains full PDFs
     try {
       const lightweight = invoices.map((inv) => ({
         ...inv,
@@ -204,8 +203,7 @@ export function saveBackendConfig(backendConfig) {
 }
 
 /**
- * Converts a Base64 PDF Data URL into a native browser Blob URL so iframes and new tabs
- * never get blocked by Chromium data-URI security policies.
+ * Converts a Base64 PDF Data URL into a native browser Blob URL
  */
 export function createPdfBlobUrl(dataUrl) {
   if (!dataUrl || typeof dataUrl !== 'string') return null;
@@ -286,27 +284,159 @@ function encodeGitHubFilePath(filePath) {
 }
 
 /**
+ * Automatically fetches the shared `data/esg-invoices.json` database for ANY visitor
+ * accessing the website (no token required to read from a public repository!).
+ * First queries the live GitHub Contents API (instant updates), then falls back to `./data/esg-invoices.json`.
+ */
+export async function fetchSharedRepositoryDatabase(ghConfig = {}) {
+  const owner = (ghConfig.owner || 'Mhutt97').trim();
+  const repo = (ghConfig.repo || 'esg-energy-tracker').trim();
+  const branch = (ghConfig.branch || 'main').trim();
+  const filePath = ghConfig.filePath || 'data/esg-invoices.json';
+  const token = (ghConfig.token || '').trim();
+
+  const cleanPath = encodeGitHubFilePath(filePath);
+  const apiUrl = `https://api.github.com/repos/${encodeURIComponent(
+    owner
+  )}/${encodeURIComponent(repo)}/contents/${cleanPath}?ref=${encodeURIComponent(
+    branch
+  )}`;
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  let parsed = null;
+
+  try {
+    const res = await fetch(apiUrl, { cache: 'no-store', headers });
+    if (res.ok) {
+      const data = await res.json();
+      let base64Content = data.content;
+
+      if (!base64Content && data.sha) {
+        const blobUrl = `https://api.github.com/repos/${encodeURIComponent(
+          owner
+        )}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(
+          data.sha
+        )}`;
+        const blobRes = await fetch(blobUrl, { cache: 'no-store', headers });
+        if (blobRes.ok) {
+          const blobData = await blobRes.json();
+          base64Content = blobData.content;
+        }
+      }
+
+      if (base64Content) {
+        parsed = JSON.parse(base64ToUtf8(base64Content) || '{}');
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Public GitHub API read fallback:', apiErr);
+  }
+
+  // Fallback to relative static file on GitHub Pages if API rate-limited
+  if (!parsed) {
+    try {
+      const staticRes = await fetch(
+        `./data/esg-invoices.json?t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
+      if (staticRes.ok) {
+        parsed = await staticRes.json();
+      }
+    } catch (staticErr) {
+      console.warn('Static JSON fetch fallback:', staticErr);
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const sanitizedInvoices = Array.isArray(parsed.invoices)
+    ? parsed.invoices
+        .map((inv, idx) => sanitizeInvoiceRecord(inv, idx))
+        .filter(Boolean)
+    : [];
+
+  return {
+    invoices: sanitizedInvoices,
+    orgProfile: parsed.orgProfile || DEFAULT_ORG_PROFILE,
+    sharedGsheetsUrl: parsed.sharedGsheetsUrl || '',
+    updatedAt: parsed.updatedAt || null,
+  };
+}
+
+/**
+ * Merges remote shared invoices with local invoices by ID / Invoice Number
+ * so new visitors get all shared records while preserving any unsynced local additions.
+ */
+export function mergeRemoteAndLocalInvoices(
+  remoteInvoices = [],
+  localInvoices = []
+) {
+  if (!remoteInvoices.length) return localInvoices;
+  if (!localInvoices.length) return remoteInvoices;
+
+  const mergedMap = new Map();
+  // Seed with remote shared invoices first (authoritative shared state)
+  remoteInvoices.forEach((inv) => {
+    const key = String(inv.invoiceNumber || inv.id)
+      .trim()
+      .toLowerCase();
+    mergedMap.set(key, inv);
+  });
+
+  // Preserve any local records that haven't been pushed yet, or enrich PDF dataUrl if local has it
+  localInvoices.forEach((localInv) => {
+    const key = String(localInv.invoiceNumber || localInv.id)
+      .trim()
+      .toLowerCase();
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, localInv);
+    } else {
+      const existing = mergedMap.get(key);
+      if (!existing.pdfAttachment?.dataUrl && localInv.pdfAttachment?.dataUrl) {
+        mergedMap.set(key, {
+          ...existing,
+          pdfAttachment: localInv.pdfAttachment,
+        });
+      }
+    }
+  });
+
+  return Array.from(mergedMap.values());
+}
+
+/**
  * Tests GitHub Repository & PAT permissions
  */
 export async function testGitHubConnection(ghConfig) {
   const { owner, repo, branch = 'main', token } = ghConfig;
-  if (!owner || !repo || !token) {
-    throw new Error(
-      'Please enter GitHub Owner, Repository Name, and Personal Access Token.'
-    );
+  if (!owner || !repo) {
+    throw new Error('Please enter GitHub Owner and Repository Name.');
   }
 
   const repoUrl = `https://api.github.com/repos/${encodeURIComponent(
     owner.trim()
   )}/${encodeURIComponent(repo.trim())}`;
 
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  if (token && token.trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`;
+  }
+
   const res = await fetch(repoUrl, {
     cache: 'no-store',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token.trim()}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -327,14 +457,12 @@ export async function testGitHubConnection(ghConfig) {
 }
 
 /**
- * GitHub API Integration — Pulls JSON file from repository (with >1 MB Git Blob API fallback)
+ * GitHub API Integration — Pulls JSON file from repository (works with OR without token for public repos!)
  */
 export async function pullFromGitHub(ghConfig) {
   const { owner, repo, branch = 'main', filePath, token } = ghConfig;
-  if (!owner || !repo || !filePath || !token) {
-    throw new Error(
-      'Please provide GitHub Owner, Repository, File Path, and Personal Access Token.'
-    );
+  if (!owner || !repo || !filePath) {
+    throw new Error('Please provide GitHub Owner, Repository, and File Path.');
   }
 
   const cleanPath = encodeGitHubFilePath(filePath);
@@ -346,9 +474,11 @@ export async function pullFromGitHub(ghConfig) {
 
   const headers = {
     Accept: 'application/vnd.github+json',
-    Authorization: `Bearer ${token.trim()}`,
     'X-GitHub-Api-Version': '2022-11-28',
   };
+  if (token && token.trim()) {
+    headers.Authorization = `Bearer ${token.trim()}`;
+  }
 
   const res = await fetch(url, {
     cache: 'no-store',
@@ -357,7 +487,7 @@ export async function pullFromGitHub(ghConfig) {
 
   if (res.status === 404) {
     throw new Error(
-      `File "${filePath}" not found on branch "${branch}". Click "Commit & Push Invoices to GitHub" first to initialize it.`
+      `File "${filePath}" not found on branch "${branch}". Click "Commit & Push to GitHub" first to initialize it.`
     );
   }
 
@@ -371,7 +501,6 @@ export async function pullFromGitHub(ghConfig) {
   const data = await res.json();
   let base64Content = data.content;
 
-  // If file exceeds 1 MB, GitHub Contents API omits `content` and provides `sha` for Git Blob API
   if (!base64Content && data.sha) {
     const blobUrl = `https://api.github.com/repos/${encodeURIComponent(
       owner.trim()
@@ -399,6 +528,7 @@ export async function pullFromGitHub(ghConfig) {
   return {
     invoices: sanitizedInvoices,
     orgProfile: parsed.orgProfile || DEFAULT_ORG_PROFILE,
+    sharedGsheetsUrl: parsed.sharedGsheetsUrl || '',
     sha: data.sha,
     htmlUrl: data.html_url,
   };
@@ -411,7 +541,7 @@ export async function pushToGitHub(ghConfig, payload, retryCount = 0) {
   const { owner, repo, branch = 'main', filePath, token } = ghConfig;
   if (!owner || !repo || !filePath || !token) {
     throw new Error(
-      'Please provide GitHub Owner, Repository, File Path, and Personal Access Token.'
+      'To publish invoices to the shared GitHub repository so all website visitors can see them, please enter your GitHub Personal Access Token in Database Sync.'
     );
   }
 
@@ -449,6 +579,7 @@ export async function pushToGitHub(ghConfig, payload, retryCount = 0) {
     schemaVersion: '2.2',
     updatedAt: new Date().toISOString(),
     orgProfile: payload.orgProfile,
+    sharedGsheetsUrl: payload.sharedGsheetsUrl || '',
     invoices: (payload.invoices || []).map((inv, idx) => {
       const cleanInv = sanitizeInvoiceRecord(inv, idx);
       return {
@@ -478,7 +609,6 @@ export async function pushToGitHub(ghConfig, payload, retryCount = 0) {
     body: JSON.stringify(body),
   });
 
-  // Automatically resolve SHA conflict if two updates happened in rapid succession
   if (putRes.status === 409 && retryCount < 1) {
     return pushToGitHub(ghConfig, payload, retryCount + 1);
   }
@@ -537,7 +667,6 @@ export async function pullFromGoogleSheets(gsConfig) {
 
 /**
  * Google Sheets Apps Script Webhook Integration — Pushes rows to Google Sheet
- * Strips heavy Base64 PDF blobs so Google Sheets cells never exceed the 50,000-character limit!
  */
 export async function pushToGoogleSheets(gsConfig, payload) {
   const { webAppUrl } = gsConfig;
@@ -552,7 +681,6 @@ export async function pushToGoogleSheets(gsConfig, payload) {
     const metrics = calculateInvoiceEsgMetrics(cleanInv);
     return {
       ...cleanInv,
-      // Omit raw Base64 PDF dataUrl from Google Sheets cell storage to avoid 50k char cell limit
       pdfAttachment: cleanInv.pdfAttachment
         ? {
             name: cleanInv.pdfAttachment.name,
@@ -596,7 +724,6 @@ export async function pushToGoogleSheets(gsConfig, payload) {
 
 /**
  * Ready-to-copy Google Apps Script code for the user's Google Sheet.
- * Uses multi-row 40,000-char chunking in ESG_RawState so it never hits the 50,000-char cell limit.
  */
 export const GOOGLE_APPS_SCRIPT_SNIPPET = `// 1. Open your Google Sheet -> Extensions -> Apps Script
 // 2. Paste this script and click Deploy -> New deployment -> Web app
@@ -621,7 +748,6 @@ function doPost(e) {
     const payload = JSON.parse(rawText);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Chunk state into 40,000-char rows to avoid Google Sheets' 50,000-char single-cell limit
     let metaSheet = ss.getSheetByName('ESG_RawState') || ss.insertSheet('ESG_RawState');
     metaSheet.clearContents();
     const chunkSize = 40000;
@@ -663,9 +789,6 @@ function doPost(e) {
   }
 }`;
 
-/**
- * Generates an audit-ready CSV string from invoices (GBP £)
- */
 export function exportInvoicesToCsv(invoices) {
   const headers = [
     'Invoice ID',
@@ -738,10 +861,6 @@ export function exportInvoicesToCsv(invoices) {
   return [headers.join(','), ...rows].join('\n');
 }
 
-/**
- * Parses a CSV file string into sanitized UK invoice records.
- * Supports UK DD/MM/YYYY dates and currency-formatted numbers (e.g. "£3,190.00").
- */
 export function parseCsvToInvoices(csvText) {
   const lines = String(csvText || '')
     .split(/\r?\n/)
@@ -779,7 +898,6 @@ export function parseCsvToInvoices(csvText) {
 
   const headers = parseLine(lines[0]).map((h) => h.toLowerCase().trim());
 
-  // Prioritize exact header match before substring match so 'date' never steals 'start date'
   const findCol = (candidates) => {
     for (const c of candidates) {
       const exactIdx = headers.findIndex((h) => h === c);
@@ -887,9 +1005,6 @@ export function parseCsvToInvoices(csvText) {
   return imported;
 }
 
-/**
- * Validates and parses a JSON Database Snapshot file for restoration
- */
 export function parseJsonBackup(jsonText) {
   const parsed = JSON.parse(jsonText);
   const rawList = Array.isArray(parsed)

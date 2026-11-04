@@ -98,7 +98,11 @@ export default function BackendConfigModal({
     setLoading(true);
     setStatusMsg(null);
     try {
-      const res = await pushToGitHub(config.github, { invoices, orgProfile });
+      const res = await pushToGitHub(config.github, {
+        invoices,
+        orgProfile,
+        sharedGsheetsUrl: config.gsheets?.webAppUrl || '',
+      });
       const updated = {
         ...config,
         activeMode: 'github',
@@ -107,7 +111,7 @@ export default function BackendConfigModal({
       handlePersistConfig(updated);
       setStatusMsg({
         type: 'success',
-        text: `Committed ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${config.github.owner}/${config.github.repo} (${config.github.filePath}).`,
+        text: `Published ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${config.github.owner}/${config.github.repo} (${config.github.filePath}). All website visitors will now see this data automatically!`,
         url: res.htmlUrl,
       });
     } catch (err) {
