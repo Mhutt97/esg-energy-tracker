@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "updatedAt": "2026-11-04T20:00:00.000Z",
+  "orgProfile": {
+    "companyName": "Acme Sustainability Corp",
+    "reportingYear": "2026",
+    "defaultCurrency": "USD",
+    "floorAreaM2": 8500,
+    "headcountFte": 240,
+    "scope2AccountingMethod": "market",
+    "targetReductionTonnes": 65
+  },
+  "invoices": [
+    {
+      "id": "inv-2026-001",
+      "invoiceNumber": "AE-904812-01",
+      "supplier": "Austin Energy",
+      "facility": "HQ - Austin Tech Campus",
+      "accountNumber": "ACCT-88210",
+      "category": "electricity",
+      "subtype": "grid_electricity",
+      "billingPeriodStart": "2026-01-01",
+      "billingPeriodEnd": "2026-01-31",
+      "invoiceDate": "2026-02-05",
+      "quantity": 48500,
+      "unit": "kWh",
+      "renewablePct": 35,
+      "renewableInstrument": "Green Tariff / PPA",
+      "gridRegion": "US_ERCOT",
+      "cost": 5820,
+      "currency": "USD",
+      "status": "Verified",
+      "notes": "Includes 35% Texas wind PPA allocation"
+    }
+  ]
+}
