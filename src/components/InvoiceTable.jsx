@@ -185,7 +185,7 @@ export default function InvoiceTable({
           <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
             02 / Primary Audit Archive
           </div>
-          <h1 className="font-editorial text-4xl sm:text-5xl text-[#121211] mt-1">
+          <h1 className="font-editorial text-3xl sm:text-4xl text-[#121211] uppercase mt-1">
             <RevealText text="Utility Invoices & Verified Meter Ledger" />
           </h1>
         </div>

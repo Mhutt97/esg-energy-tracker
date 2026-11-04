@@ -277,10 +277,10 @@ export default function App() {
           <div className="flex items-center gap-3.5 shrink-0">
             <span className="w-2.5 h-2.5 rounded-full bg-[#D9381E] shrink-0" />
             <div className="flex items-baseline gap-2.5">
-              <span className="font-editorial text-2xl sm:text-[26px] font-normal tracking-tight text-[#121211] leading-none">
-                Aether<span className="italic font-normal text-[#575550]">ESG</span>
+              <span className="font-editorial text-lg sm:text-xl uppercase tracking-[-0.04em] text-[#121211] leading-none">
+                AETHER<span className="text-[#D9381E]">.</span>ESG
               </span>
-              <span className="hidden md:inline-block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8C8982] border-l border-[#121211]/15 pl-2.5">
+              <span className="hidden md:inline-block text-[10px] font-medium uppercase tracking-[0.18em] text-[#8C8982] border-l border-[#121211]/15 pl-2.5">
                 UK Energy Monograph · GBP (£)
               </span>
             </div>
@@ -497,8 +497,8 @@ export default function App() {
       <footer className="border-t border-[#121211]/[0.08] py-10 px-4 sm:px-8 lg:px-12 text-xs text-[#8C8982] no-print bg-[#F6F5F0]">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="font-editorial text-xl text-[#121211]">
-              Aether<span className="italic text-[#575550]">ESG</span>
+            <span className="font-editorial text-base uppercase text-[#121211]">
+              AETHER<span className="text-[#D9381E]">.</span>ESG
             </span>
             <span className="text-[11px] uppercase tracking-[0.16em]">
               UK Commercial Energy & Carbon Ledger · London · Sheffield · Leeds · Bristol

@@ -3,8 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --font-serif: "Instrument Serif", "Cormorant Garamond", "Playfair Display", Georgia, serif;
-  --font-sans: "Satoshi", "Satoshi Variable", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Strict Modern Typography System:
+     1. Ultra-bold, extended neo-grotesque display header
+     2. Clean, low-contrast, minimalist sans-serif body text */
+  --font-display: "Archivo", "Satoshi", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: "Inter", "Satoshi", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
   /* Sophisticated Muted Neutral Palette */
   --canvas: #F6F5F0;
@@ -41,19 +44,29 @@ body {
   background-image: radial-gradient(ellipse 90% 45% at 50% 0%, rgba(255, 255, 255, 0.85) 0%, rgba(246, 245, 240, 0) 100%);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: -0.011em;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography Classes */
-.font-editorial {
-  font-family: var(--font-serif) !important;
-  letter-spacing: -0.02em;
+/* Ultra-Bold Extended Neo-Grotesque Header Class */
+.font-editorial,
+.font-display {
+  font-family: var(--font-display) !important;
+  font-weight: 850 !important;
+  font-stretch: 122%;
+  font-variation-settings: "wdth" 122, "wght" 850;
+  letter-spacing: -0.04em;
+  font-style: normal !important;
 }
 
+/* Clean, Low-Contrast Minimalist Sans-Serif Body Class */
 .font-sans-clean {
   font-family: var(--font-sans) !important;
+  font-weight: 400;
+  letter-spacing: -0.011em;
 }
 
 /* Anti-Gravity Floating Surfaces */

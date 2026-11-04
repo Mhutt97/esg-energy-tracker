@@ -419,9 +419,10 @@ export default function DashboardView({
               </span>
             </div>
 
-            <h1 className="font-editorial text-5xl sm:text-6xl lg:text-[68px] font-normal text-[#121211] leading-[0.98] tracking-[-0.025em]">
-              <span className="italic text-[#575550]">Weightless</span> clarity
-              for enterprise energy &amp; carbon accounting.
+            <h1 className="font-editorial text-4xl sm:text-5xl lg:text-[54px] text-[#121211] leading-[0.98] tracking-[-0.04em] uppercase">
+              Weightless clarity for enterprise{' '}
+              <span className="text-[#D9381E]">energy &amp; carbon</span>{' '}
+              accounting.
             </h1>
 
             <p className="text-sm sm:text-base text-[#575550] max-w-2xl leading-relaxed font-normal">
@@ -486,7 +487,7 @@ export default function DashboardView({
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
                   Net Carbon
                 </div>
-                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                <div className="font-editorial text-2xl text-[#121211] mt-1">
                   <AnimatedNumber
                     value={analytics.totalGhgTonnes}
                     decimals={2}
@@ -501,7 +502,7 @@ export default function DashboardView({
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
                   Total Energy
                 </div>
-                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                <div className="font-editorial text-2xl text-[#121211] mt-1">
                   <AnimatedNumber
                     value={analytics.totalEnergyMwh}
                     decimals={2}
@@ -516,7 +517,7 @@ export default function DashboardView({
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
                   Gross Spend
                 </div>
-                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                <div className="font-editorial text-2xl text-[#121211] mt-1">
                   <AnimatedNumber
                     value={analytics.totalGross}
                     decimals={0}
@@ -532,7 +533,7 @@ export default function DashboardView({
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
                   Meter Fidelity
                 </div>
-                <div className="font-editorial text-3xl text-[#1B4332] mt-0.5">
+                <div className="font-editorial text-2xl text-[#1B4332] mt-1">
                   {filteredInvoices.length > 0
                     ? Math.round(
                         (analytics.actualReadingCount /
@@ -790,7 +791,7 @@ export default function DashboardView({
               <AnimatedNumber
                 value={analytics.totalGhgTonnes}
                 decimals={2}
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">tCO₂e</span>
             </div>
@@ -814,7 +815,7 @@ export default function DashboardView({
               <AnimatedNumber
                 value={analytics.electricityKwh}
                 decimals={0}
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">kWh</span>
             </div>
@@ -838,7 +839,7 @@ export default function DashboardView({
               <AnimatedNumber
                 value={analytics.fuelKwhEq}
                 decimals={0}
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">kWh-eq</span>
             </div>
@@ -864,7 +865,7 @@ export default function DashboardView({
               <AnimatedNumber
                 value={analytics.totalEnergyMwh}
                 decimals={2}
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">MWh</span>
             </div>
@@ -891,7 +892,7 @@ export default function DashboardView({
               <AnimatedNumber
                 value={analytics.waterM3}
                 decimals={1}
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">m³</span>
             </div>
@@ -926,7 +927,7 @@ export default function DashboardView({
                 value={analytics.totalGross}
                 decimals={2}
                 prefix="£"
-                className="font-editorial text-5xl text-[#121211]"
+                className="font-editorial text-3xl sm:text-4xl text-[#121211]"
               />
               <span className="text-xs font-medium text-[#8C8982]">Gross</span>
             </div>
