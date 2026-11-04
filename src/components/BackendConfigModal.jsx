@@ -13,16 +13,20 @@ import {
   Check,
   ShieldCheck,
   Upload,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import {
   pullFromGitHub,
   pushToGitHub,
-  testGitHubConnection,
+  verifyOwnerGitHubAccess,
   pullFromGoogleSheets,
   pushToGoogleSheets,
   parseJsonBackup,
   getStorageDiagnostics,
   GOOGLE_APPS_SCRIPT_SNIPPET,
+  AUTHORIZED_GITHUB_OWNER,
+  AUTHORIZED_GITHUB_REPO,
 } from '../services/storageService.js';
 
 export default function BackendConfigModal({
@@ -33,6 +37,10 @@ export default function BackendConfigModal({
   invoices,
   orgProfile,
   onRestoreRemoteData,
+  isOwnerUnlocked = false,
+  verifiedOwnerLogin = null,
+  onOwnerVerified,
+  onLockOwnerSession,
 }) {
   const [config, setConfig] = useState(backendConfig);
   const [activeTab, setActiveTab] = useState(
@@ -76,16 +84,26 @@ export default function BackendConfigModal({
     onSaveConfig(nextConfig);
   };
 
-  const handleGitHubTest = async () => {
+  const handleVerifyOwner = async () => {
     setLoading(true);
     setStatusMsg(null);
     try {
-      const info = await testGitHubConnection(config.github);
+      const verification = await verifyOwnerGitHubAccess(config.github.token);
+      const updated = {
+        ...config,
+        github: {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
+      };
+      handlePersistConfig(updated);
+      if (onOwnerVerified) {
+        onOwnerVerified(config.github.token, verification.ownerLogin);
+      }
       setStatusMsg({
         type: 'success',
-        text: `Connected to ${info.fullName} (default branch: ${
-          info.defaultBranch
-        }). Write permission: ${info.canPush ? 'Verified' : 'Read-Only'}.`,
+        text: `Owner Authenticated (${verification.ownerLogin}) on ${verification.fullName}. Data input, invoice editing, and cloud commits are now unlocked for this browser!`,
       });
     } catch (err) {
       setStatusMsg({ type: 'error', text: err.message });
@@ -98,20 +116,36 @@ export default function BackendConfigModal({
     setLoading(true);
     setStatusMsg(null);
     try {
-      const res = await pushToGitHub(config.github, {
-        invoices,
-        orgProfile,
-        sharedGsheetsUrl: config.gsheets?.webAppUrl || '',
-      });
+      const verification = await verifyOwnerGitHubAccess(config.github.token);
+      if (onOwnerVerified) {
+        onOwnerVerified(config.github.token, verification.ownerLogin);
+      }
+      const res = await pushToGitHub(
+        {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
+        {
+          invoices,
+          orgProfile,
+          sharedGsheetsUrl: config.gsheets?.webAppUrl || '',
+        }
+      );
       const updated = {
         ...config,
         activeMode: 'github',
         lastSyncedAt: new Date().toISOString(),
+        github: {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
       };
       handlePersistConfig(updated);
       setStatusMsg({
         type: 'success',
-        text: `Published ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${config.github.owner}/${config.github.repo} (${config.github.filePath}). All website visitors will now see this data automatically!`,
+        text: `Published ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO} (${config.github.filePath}). All website visitors can view this data in Read-Only mode!`,
         url: res.htmlUrl,
       });
     } catch (err) {
@@ -145,6 +179,13 @@ export default function BackendConfigModal({
   };
 
   const handleGoogleSheetsPush = async () => {
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Please authenticate as ${AUTHORIZED_GITHUB_OWNER} on the GitHub Repository API tab before syncing to Google Sheets.`,
+      });
+      return;
+    }
     setLoading(true);
     setStatusMsg(null);
     try {
@@ -167,6 +208,13 @@ export default function BackendConfigModal({
   };
 
   const handleGoogleSheetsPull = async () => {
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Please authenticate as ${AUTHORIZED_GITHUB_OWNER} on the GitHub Repository API tab first.`,
+      });
+      return;
+    }
     setLoading(true);
     setStatusMsg(null);
     try {
@@ -219,6 +267,14 @@ export default function BackendConfigModal({
 
   const handleImportJsonFile = (e) => {
     setStatusMsg(null);
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Restoring a JSON snapshot is restricted to repository owner ${AUTHORIZED_GITHUB_OWNER}.`,
+      });
+      if (jsonInputRef.current) jsonInputRef.current.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -336,6 +392,53 @@ export default function BackendConfigModal({
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Owner Access Control Banner */}
+          <div
+            className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+              isOwnerUnlocked
+                ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                : 'bg-amber-50/90 border-amber-200 text-amber-950'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {isOwnerUnlocked ? (
+                <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <div className="text-xs font-extrabold uppercase tracking-wider">
+                  {isOwnerUnlocked
+                    ? `Owner Edit Mode Unlocked (${
+                        verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                      })`
+                    : `Public Read-Only Mode · Locked to ${AUTHORIZED_GITHUB_OWNER}`}
+                </div>
+                <p className="text-xs mt-0.5 opacity-90">
+                  {isOwnerUnlocked
+                    ? 'You are authenticated as the repository owner. You can log invoices, edit records, attach PDFs, and commit updates.'
+                    : `Because this is a public repository, all visitors can view dashboards and invoices in Read-Only mode. Only ${AUTHORIZED_GITHUB_OWNER} can unlock data input and edits using a GitHub Personal Access Token below.`}
+                </p>
+              </div>
+            </div>
+            {isOwnerUnlocked && onLockOwnerSession && (
+              <button
+                type="button"
+                onClick={() => {
+                  onLockOwnerSession();
+                  setStatusMsg({
+                    type: 'success',
+                    text: 'Session locked back to Public Read-Only Mode.',
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Lock Session
+              </button>
+            )}
+          </div>
+
           {statusMsg && (
             <div
               className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
@@ -381,27 +484,25 @@ export default function BackendConfigModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    GitHub Owner (User or Org) *
+                    Authorized GitHub Owner (Locked)
                   </label>
                   <input
                     type="text"
-                    value={config.github.owner}
-                    onChange={(e) => updateGithub('owner', e.target.value)}
-                    placeholder="Mhutt97"
-                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
+                    value={AUTHORIZED_GITHUB_OWNER}
+                    disabled
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 bg-slate-100 text-slate-500 rounded-xl cursor-not-allowed"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Repository Name *
+                    Authorized Repository (Locked)
                   </label>
                   <input
                     type="text"
-                    value={config.github.repo}
-                    onChange={(e) => updateGithub('repo', e.target.value)}
-                    placeholder="esg-energy-tracker"
-                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
+                    value={AUTHORIZED_GITHUB_REPO}
+                    disabled
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 bg-slate-100 text-slate-500 rounded-xl cursor-not-allowed"
                   />
                 </div>
 
@@ -434,22 +535,23 @@ export default function BackendConfigModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  GitHub Fine-Grained Personal Access Token (PAT) *
+                  Owner GitHub Personal Access Token (PAT for{' '}
+                  {AUTHORIZED_GITHUB_OWNER}) *
                 </label>
                 <input
                   type="password"
                   value={config.github.token}
                   onChange={(e) => updateGithub('token', e.target.value)}
-                  placeholder="github_pat_..."
+                  placeholder="github_pat_... (Required to unlock data input & edits)"
                   className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Stored locally in your browser. Requires{' '}
-                  <strong>Contents: Read and Write</strong> permission on{' '}
-                  <code>
-                    {config.github.owner}/{config.github.repo}
-                  </code>
-                  .
+                  Verified directly against GitHub API for{' '}
+                  <strong>
+                    {AUTHORIZED_GITHUB_OWNER}/{AUTHORIZED_GITHUB_REPO}
+                  </strong>
+                  . Stored only in your own browser&apos;s local storage — never
+                  exposed to other visitors.
                 </p>
               </div>
 
@@ -457,11 +559,13 @@ export default function BackendConfigModal({
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={handleGitHubTest}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50"
+                  onClick={handleVerifyOwner}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50"
                 >
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  Test Connection
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  {isOwnerUnlocked
+                    ? 'Re-Verify Owner Access'
+                    : `Verify Owner (${AUTHORIZED_GITHUB_OWNER}) & Unlock Edits`}
                 </button>
 
                 <button
@@ -485,7 +589,7 @@ export default function BackendConfigModal({
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
                 >
                   <DownloadCloud className="w-4 h-4" />
-                  Pull from GitHub
+                  Pull Latest from GitHub
                 </button>
               </div>
             </div>

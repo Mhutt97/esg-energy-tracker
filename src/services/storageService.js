@@ -24,13 +24,16 @@ const IDB_CONFIG = {
   STORE_INVOICES: 'invoices_store',
 };
 
+export const AUTHORIZED_GITHUB_OWNER = 'Mhutt97';
+export const AUTHORIZED_GITHUB_REPO = 'esg-energy-tracker';
+
 export const DEFAULT_BACKEND_CONFIG = {
   activeMode: 'github', // Default to GitHub shared repo mode
   autoSync: true, // Auto-sync enabled by default so saves publish for all users
   lastSyncedAt: null,
   github: {
-    owner: 'Mhutt97',
-    repo: 'esg-energy-tracker',
+    owner: AUTHORIZED_GITHUB_OWNER,
+    repo: AUTHORIZED_GITHUB_REPO,
     branch: 'main',
     filePath: 'data/esg-invoices.json',
     token: '',
@@ -417,14 +420,13 @@ export function mergeRemoteAndLocalInvoices(
  * Tests GitHub Repository & PAT permissions
  */
 export async function testGitHubConnection(ghConfig) {
-  const { owner, repo, branch = 'main', token } = ghConfig;
-  if (!owner || !repo) {
-    throw new Error('Please enter GitHub Owner and Repository Name.');
-  }
+  const owner = AUTHORIZED_GITHUB_OWNER;
+  const repo = AUTHORIZED_GITHUB_REPO;
+  const { branch = 'main', token } = ghConfig || {};
 
   const repoUrl = `https://api.github.com/repos/${encodeURIComponent(
-    owner.trim()
-  )}/${encodeURIComponent(repo.trim())}`;
+    owner
+  )}/${encodeURIComponent(repo)}`;
 
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -447,12 +449,87 @@ export async function testGitHubConnection(ghConfig) {
   }
 
   const repoData = await res.json();
-  const canPush = Boolean(repoData.permissions?.push);
+  const canPush = Boolean(
+    repoData.permissions?.push || repoData.permissions?.admin
+  );
   return {
     fullName: repoData.full_name,
     defaultBranch: repoData.default_branch || branch,
     canPush,
     private: repoData.private,
+  };
+}
+
+/**
+ * Cryptographically verifies via GitHub API that the provided PAT belongs to
+ * the authorized repository owner (Mhutt97) with write/push permissions on
+ * Mhutt97/esg-energy-tracker. Zero passwords or secrets are stored in code.
+ */
+export async function verifyOwnerGitHubAccess(tokenInput) {
+  const cleanToken = String(tokenInput || '').trim();
+  if (!cleanToken) {
+    throw new Error(
+      'Please enter your GitHub Personal Access Token for Mhutt97/esg-energy-tracker to unlock Owner Edit Mode.'
+    );
+  }
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${cleanToken}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  // 1. Verify authenticated user identity via GitHub API
+  const userRes = await fetch('https://api.github.com/user', {
+    cache: 'no-store',
+    headers,
+  });
+
+  if (!userRes.ok) {
+    throw new Error(
+      'Invalid or expired GitHub Personal Access Token. Access remains locked in Read-Only mode.'
+    );
+  }
+
+  const userData = await userRes.json();
+  const login = String(userData.login || '').trim();
+
+  if (login.toLowerCase() !== AUTHORIZED_GITHUB_OWNER.toLowerCase()) {
+    throw new Error(
+      `Access Denied: Authenticated as "${login}", but data input and edits are strictly locked to repository owner "${AUTHORIZED_GITHUB_OWNER}".`
+    );
+  }
+
+  // 2. Verify repository write permission on Mhutt97/esg-energy-tracker
+  const repoUrl = `https://api.github.com/repos/${encodeURIComponent(
+    AUTHORIZED_GITHUB_OWNER
+  )}/${encodeURIComponent(AUTHORIZED_GITHUB_REPO)}`;
+  const repoRes = await fetch(repoUrl, {
+    cache: 'no-store',
+    headers,
+  });
+
+  if (!repoRes.ok) {
+    throw new Error(
+      `Could not verify repository permissions for ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO}.`
+    );
+  }
+
+  const repoData = await repoRes.json();
+  const canPush = Boolean(
+    repoData.permissions?.push || repoData.permissions?.admin
+  );
+
+  if (!canPush) {
+    throw new Error(
+      `Token belongs to ${AUTHORIZED_GITHUB_OWNER} but lacks "Contents: Read and Write" permission on ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO}.`
+    );
+  }
+
+  return {
+    verified: true,
+    ownerLogin: login,
+    fullName: repoData.full_name,
   };
 }
 

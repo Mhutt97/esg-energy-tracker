@@ -39,6 +39,8 @@ export default function InvoiceTable({
   onDuplicateInvoice,
   onDeleteInvoice,
   onBulkImport,
+  isOwnerUnlocked = false,
+  onRequestOwnerUnlock,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -222,30 +224,34 @@ export default function InvoiceTable({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              title="Download CSV template"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              CSV Template
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Import CSV
-            </button>
+            {isOwnerUnlocked && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  title="Download CSV template"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  CSV Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import CSV
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={handleDownloadCsv}
@@ -254,14 +260,26 @@ export default function InvoiceTable({
               <Download className="w-3.5 h-3.5" />
               Export CSV ({filtered.length})
             </button>
-            <button
-              type="button"
-              onClick={onAddInvoice}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Log Utility Invoice
-            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={onAddInvoice}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Log Utility Invoice
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestOwnerUnlock}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+                title="Data input and edits are restricted to the repository owner (Mhutt97)"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                Read-Only · Owner Unlock
+              </button>
+            )}
           </div>
         </div>
 
@@ -383,13 +401,24 @@ export default function InvoiceTable({
                       Log a utility invoice or import a verified CSV file to
                       populate the ledger.
                     </p>
-                    <button
-                      type="button"
-                      onClick={onAddInvoice}
-                      className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
-                    >
-                      + Log Utility Invoice
-                    </button>
+                    {isOwnerUnlocked ? (
+                      <button
+                        type="button"
+                        onClick={onAddInvoice}
+                        className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
+                      >
+                        + Log Utility Invoice
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onRequestOwnerUnlock}
+                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 text-slate-200 font-semibold hover:bg-slate-800 transition-colors"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        Owner Unlock to Add Data
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -532,32 +561,42 @@ export default function InvoiceTable({
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                            title="Amend record"
+                        {isOwnerUnlocked ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => onEditInvoice(inv)}
+                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              title="Amend record"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDuplicateInvoice(inv)}
+                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              title="Duplicate invoice"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteInvoice(inv.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              title="Delete invoice"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider select-none"
+                            title="Edits are locked to repository owner (Mhutt97)"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDuplicateInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                            title="Duplicate invoice"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteInvoice(inv.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="Delete invoice"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                            <Lock className="w-2.5 h-2.5" />
+                            Locked
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

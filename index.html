@@ -118,7 +118,7 @@
     <script type="text/babel" data-type="module">
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Zap, Flame, Droplets, Building2, Plus, CheckCircle2, AlertCircle, X, Search, Download, Upload, Edit3, Copy, Trash2, Clock, FileDown, FileText, Lock, ExternalLink, ArrowUpRight, BarChart3, Table2, Layers, Filter, Github, FileSpreadsheet, HardDrive, RefreshCw, UploadCloud, DownloadCloud, AlertTriangle, Check, ShieldCheck, LayoutDashboard, Receipt, Cloud } from 'lucide-react';
+import { Zap, Flame, Droplets, Building2, Plus, CheckCircle2, AlertCircle, X, Search, Download, Upload, Edit3, Copy, Trash2, Clock, FileDown, FileText, Lock, Unlock, ExternalLink, ArrowUpRight, BarChart3, Table2, Layers, Filter, Github, FileSpreadsheet, HardDrive, RefreshCw, UploadCloud, DownloadCloud, AlertTriangle, Check, ShieldCheck, LayoutDashboard, Receipt, Cloud } from 'lucide-react';
 
 // --- File: emissionFactors.js ---
 /**
@@ -585,13 +585,16 @@ const IDB_CONFIG = {
   STORE_INVOICES: 'invoices_store',
 };
 
+const AUTHORIZED_GITHUB_OWNER = 'Mhutt97';
+const AUTHORIZED_GITHUB_REPO = 'esg-energy-tracker';
+
 const DEFAULT_BACKEND_CONFIG = {
   activeMode: 'github', // Default to GitHub shared repo mode
   autoSync: true, // Auto-sync enabled by default so saves publish for all users
   lastSyncedAt: null,
   github: {
-    owner: 'Mhutt97',
-    repo: 'esg-energy-tracker',
+    owner: AUTHORIZED_GITHUB_OWNER,
+    repo: AUTHORIZED_GITHUB_REPO,
     branch: 'main',
     filePath: 'data/esg-invoices.json',
     token: '',
@@ -978,14 +981,13 @@ function mergeRemoteAndLocalInvoices(
  * Tests GitHub Repository & PAT permissions
  */
 async function testGitHubConnection(ghConfig) {
-  const { owner, repo, branch = 'main', token } = ghConfig;
-  if (!owner || !repo) {
-    throw new Error('Please enter GitHub Owner and Repository Name.');
-  }
+  const owner = AUTHORIZED_GITHUB_OWNER;
+  const repo = AUTHORIZED_GITHUB_REPO;
+  const { branch = 'main', token } = ghConfig || {};
 
   const repoUrl = `https://api.github.com/repos/${encodeURIComponent(
-    owner.trim()
-  )}/${encodeURIComponent(repo.trim())}`;
+    owner
+  )}/${encodeURIComponent(repo)}`;
 
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -1008,12 +1010,87 @@ async function testGitHubConnection(ghConfig) {
   }
 
   const repoData = await res.json();
-  const canPush = Boolean(repoData.permissions?.push);
+  const canPush = Boolean(
+    repoData.permissions?.push || repoData.permissions?.admin
+  );
   return {
     fullName: repoData.full_name,
     defaultBranch: repoData.default_branch || branch,
     canPush,
     private: repoData.private,
+  };
+}
+
+/**
+ * Cryptographically verifies via GitHub API that the provided PAT belongs to
+ * the authorized repository owner (Mhutt97) with write/push permissions on
+ * Mhutt97/esg-energy-tracker. Zero passwords or secrets are stored in code.
+ */
+async function verifyOwnerGitHubAccess(tokenInput) {
+  const cleanToken = String(tokenInput || '').trim();
+  if (!cleanToken) {
+    throw new Error(
+      'Please enter your GitHub Personal Access Token for Mhutt97/esg-energy-tracker to unlock Owner Edit Mode.'
+    );
+  }
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${cleanToken}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
+  // 1. Verify authenticated user identity via GitHub API
+  const userRes = await fetch('https://api.github.com/user', {
+    cache: 'no-store',
+    headers,
+  });
+
+  if (!userRes.ok) {
+    throw new Error(
+      'Invalid or expired GitHub Personal Access Token. Access remains locked in Read-Only mode.'
+    );
+  }
+
+  const userData = await userRes.json();
+  const login = String(userData.login || '').trim();
+
+  if (login.toLowerCase() !== AUTHORIZED_GITHUB_OWNER.toLowerCase()) {
+    throw new Error(
+      `Access Denied: Authenticated as "${login}", but data input and edits are strictly locked to repository owner "${AUTHORIZED_GITHUB_OWNER}".`
+    );
+  }
+
+  // 2. Verify repository write permission on Mhutt97/esg-energy-tracker
+  const repoUrl = `https://api.github.com/repos/${encodeURIComponent(
+    AUTHORIZED_GITHUB_OWNER
+  )}/${encodeURIComponent(AUTHORIZED_GITHUB_REPO)}`;
+  const repoRes = await fetch(repoUrl, {
+    cache: 'no-store',
+    headers,
+  });
+
+  if (!repoRes.ok) {
+    throw new Error(
+      `Could not verify repository permissions for ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO}.`
+    );
+  }
+
+  const repoData = await repoRes.json();
+  const canPush = Boolean(
+    repoData.permissions?.push || repoData.permissions?.admin
+  );
+
+  if (!canPush) {
+    throw new Error(
+      `Token belongs to ${AUTHORIZED_GITHUB_OWNER} but lacks "Contents: Read and Write" permission on ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO}.`
+    );
+  }
+
+  return {
+    verified: true,
+    ownerLogin: login,
+    fullName: repoData.full_name,
   };
 }
 
@@ -1684,6 +1761,1439 @@ function RevealText({ text = '', className = '', delayMs = 0 }) {
 }
 
 
+// --- File: InvoiceModal.jsx ---
+
+const EMPTY_FORM = {
+  invoiceNumber: '',
+  invoiceDate: '2026-05-02',
+  supplier: SUPPLIERS[0],
+  siteName: SITES[0],
+  category: 'electricity',
+  billingPeriodStart: '2026-04-01',
+  billingPeriodEnd: '2026-04-30',
+  readingType: 'Actual',
+  usage: '',
+  unit: 'kWh',
+  netCost: '',
+  vatRate: 20,
+  vatAmount: '0.00',
+  grossCost: '0.00',
+  currency: 'GBP',
+  notes: '',
+  pdfAttachment: null,
+};
+
+function InvoiceModal({
+  isOpen,
+  onClose,
+  onSave,
+  editingInvoice,
+  existingInvoices = [],
+}) {
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [touched, setTouched] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const pdfInputRef = useRef(null);
+
+  useEffect(() => {
+    setTouched({});
+    setSubmitAttempted(false);
+    setPdfError('');
+
+    if (editingInvoice) {
+      const net = Number(editingInvoice.netCost ?? editingInvoice.cost) || 0;
+      const rate =
+        editingInvoice.vatRate !== undefined
+          ? Number(editingInvoice.vatRate)
+          : 20;
+      const vat =
+        editingInvoice.vatAmount !== undefined
+          ? Number(editingInvoice.vatAmount)
+          : Number((net * (rate / 100)).toFixed(2));
+      const gross =
+        editingInvoice.grossCost !== undefined
+          ? Number(editingInvoice.grossCost)
+          : Number((net + vat).toFixed(2));
+
+      setForm({
+        ...EMPTY_FORM,
+        ...editingInvoice,
+        invoiceDate:
+          editingInvoice.invoiceDate ||
+          editingInvoice.billingPeriodEnd ||
+          '2026-05-02',
+        siteName: editingInvoice.siteName || editingInvoice.facility || SITES[0],
+        supplier: SUPPLIERS.includes(editingInvoice.supplier)
+          ? editingInvoice.supplier
+          : SUPPLIERS[0],
+        readingType: READING_TYPES.includes(editingInvoice.readingType)
+          ? editingInvoice.readingType
+          : 'Actual',
+        usage: editingInvoice.usage ?? editingInvoice.quantity ?? '',
+        netCost: net > 0 ? String(net) : '',
+        vatRate: rate,
+        vatAmount: vat.toFixed(2),
+        grossCost: gross.toFixed(2),
+        currency: 'GBP',
+        pdfAttachment: editingInvoice.pdfAttachment || null,
+      });
+    } else {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      setForm({
+        ...EMPTY_FORM,
+        invoiceDate: todayIso,
+        invoiceNumber: `INV-${new Date().getFullYear()}-${String(
+          Math.floor(1000 + Math.random() * 9000)
+        )}`,
+      });
+    }
+  }, [editingInvoice, isOpen]);
+
+  const validation = useMemo(() => {
+    return validateInvoiceForm(form, existingInvoices, editingInvoice?.id);
+  }, [form, existingInvoices, editingInvoice]);
+
+  const liveMetrics = useMemo(() => {
+    return calculateInvoiceEsgMetrics(form);
+  }, [form]);
+
+  if (!isOpen) return null;
+
+  const currentCat =
+    UTILITY_CATEGORIES[form.category] || UTILITY_CATEGORIES.electricity;
+
+  const markTouched = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const showError = (field) =>
+    (touched[field] || submitAttempted) && validation.errors[field];
+
+  const handleCategoryChange = (newCategory) => {
+    const catObj = UTILITY_CATEGORIES[newCategory];
+    setForm((prev) => ({
+      ...prev,
+      category: newCategory,
+      unit: catObj.units[0].id,
+    }));
+  };
+
+  const handleNetOrVatChange = (newNetRaw, newVatRateRaw) => {
+    const netNum = Math.max(0, Number(newNetRaw) || 0);
+    const rateNum = Number(newVatRateRaw);
+    const vatNum = netNum * (rateNum / 100);
+    const grossNum = netNum + vatNum;
+
+    setForm((prev) => ({
+      ...prev,
+      netCost: newNetRaw,
+      vatRate: rateNum,
+      vatAmount: vatNum.toFixed(2),
+      grossCost: grossNum.toFixed(2),
+    }));
+  };
+
+  const handlePdfUpload = (e) => {
+    setPdfError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isPdf =
+      file.type === 'application/pdf' ||
+      file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setPdfError('Only PDF documents (.pdf) are permitted for invoice records.');
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+      return;
+    }
+
+    // 5 MB limit for database/JSON storage
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setPdfError('PDF file size must be under 5.0 MB for database storage.');
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = String(ev.target?.result || '');
+      setForm((prev) => ({
+        ...prev,
+        pdfAttachment: {
+          name: file.name,
+          size: file.size,
+          type: 'application/pdf',
+          uploadedAt: new Date().toISOString(),
+          dataUrl,
+        },
+      }));
+    };
+    reader.onerror = () => {
+      setPdfError('Failed to read PDF file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePreviewPdf = () => {
+    if (!form.pdfAttachment?.dataUrl) return;
+    const blobUrl = createPdfBlobUrl(form.pdfAttachment.dataUrl);
+    if (blobUrl) {
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSubmitAttempted(true);
+
+    if (!validation.isValid || pdfError) {
+      return;
+    }
+
+    const netNum = Number(form.netCost) || 0;
+    const rateNum = Number(form.vatRate);
+    const vatNum = Number((netNum * (rateNum / 100)).toFixed(2));
+    const grossNum = Number((netNum + vatNum).toFixed(2));
+
+    onSave({
+      ...form,
+      id: editingInvoice?.id || `inv-${Date.now()}`,
+      invoiceNumber: String(form.invoiceNumber).trim(),
+      usage: Number(form.usage),
+      netCost: netNum,
+      vatRate: rateNum,
+      vatAmount: vatNum,
+      grossCost: grossNum,
+      currency: 'GBP',
+    });
+  };
+
+  const errorList = Object.values(validation.errors);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
+        {/* Editorial Header */}
+        <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                Ledger Entry Form
+              </span>
+              <span className="text-slate-700">•</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
+                UK DEFRA Verified
+              </span>
+            </div>
+            <h2 className="text-base font-semibold tracking-tight mt-0.5">
+              {editingInvoice
+                ? 'Amend Utility Invoice Record'
+                : 'Log Utility Invoice'}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
+        >
+          {/* Validation Error Banner (shown if submit attempted with errors) */}
+          {submitAttempted && errorList.length > 0 && (
+            <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-900 space-y-1 animate-fade-in">
+              <div className="font-semibold flex items-center gap-1.5 text-red-800">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>
+                  Please resolve {errorList.length} verification{' '}
+                  {errorList.length === 1 ? 'issue' : 'issues'} before saving:
+                </span>
+              </div>
+              <ul className="list-disc list-inside pl-5 text-red-700 space-y-0.5">
+                {errorList.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 1. Utility Category Selector */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              01 · Utility Stream
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {[
+                {
+                  id: 'electricity',
+                  title: 'Electricity',
+                  sub: 'Scope 2 · kWh / MWh',
+                  icon: Zap,
+                },
+                {
+                  id: 'natural_gas',
+                  title: 'Natural Gas & Fuels',
+                  sub: 'Scope 1 · kWh / m³',
+                  icon: Flame,
+                },
+                {
+                  id: 'water',
+                  title: 'Water & Wastewater',
+                  sub: 'Water · m³ / kL',
+                  icon: Droplets,
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isSelected = form.category === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleCategoryChange(item.id)}
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
+                      isSelected
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    <Icon
+                      className={`w-4 h-4 mt-0.5 shrink-0 ${
+                        isSelected ? 'text-teal-400' : 'text-slate-400'
+                      }`}
+                    />
+                    <div>
+                      <div className="text-xs font-semibold">{item.title}</div>
+                      <div
+                        className={`text-[11px] ${
+                          isSelected ? 'text-slate-300' : 'text-slate-400'
+                        }`}
+                      >
+                        {item.sub}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Invoice Reference, Utilities Provider, Site Name */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              02 · Account & Site Allocation
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Invoice Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.invoiceNumber}
+                  onBlur={() => markTouched('invoiceNumber')}
+                  onChange={(e) =>
+                    setForm({ ...form, invoiceNumber: e.target.value })
+                  }
+                  placeholder="e.g. INV-2026-001"
+                  className={`w-full px-3 py-2 text-xs border rounded-lg focus:outline-none transition-colors ${
+                    showError('invoiceNumber')
+                      ? 'border-red-400 bg-red-50/40 focus:border-red-600'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('invoiceNumber') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.invoiceNumber}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Utilities Provider <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.supplier}
+                  onBlur={() => markTouched('supplier')}
+                  onChange={(e) =>
+                    setForm({ ...form, supplier: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {SUPPLIERS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Site Name <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.siteName}
+                  onBlur={() => markTouched('siteName')}
+                  onChange={(e) =>
+                    setForm({ ...form, siteName: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {SITES.map((site) => (
+                    <option key={site} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Dates & Reading Type (Invoice Date, Billing Start, Billing End, Reading Type) */}
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+              03 · Tax Point & Meter Period
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Invoice Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.invoiceDate}
+                  onBlur={() => markTouched('invoiceDate')}
+                  onChange={(e) =>
+                    setForm({ ...form, invoiceDate: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
+                    showError('invoiceDate')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('invoiceDate') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.invoiceDate}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Billing Start <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.billingPeriodStart}
+                  onBlur={() => markTouched('billingPeriodStart')}
+                  onChange={(e) =>
+                    setForm({ ...form, billingPeriodStart: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
+                    showError('billingPeriodStart')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('billingPeriodStart') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.billingPeriodStart}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Billing End <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.billingPeriodEnd}
+                  onBlur={() => markTouched('billingPeriodEnd')}
+                  onChange={(e) =>
+                    setForm({ ...form, billingPeriodEnd: e.target.value })
+                  }
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
+                    showError('billingPeriodEnd')
+                      ? 'border-red-400 bg-red-50/40'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('billingPeriodEnd') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.billingPeriodEnd}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Reading Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.readingType}
+                  onBlur={() => markTouched('readingType')}
+                  onChange={(e) =>
+                    setForm({ ...form, readingType: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {READING_TYPES.map((rt) => (
+                    <option key={rt} value={rt}>
+                      {rt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Usage & Financial Breakdown (£ GBP Net, VAT, Gross) */}
+          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 space-y-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              04 · Metered Usage & Financial Settlement (£ GBP)
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Usage <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.01"
+                  required
+                  value={form.usage}
+                  onBlur={() => markTouched('usage')}
+                  onChange={(e) => setForm({ ...form, usage: e.target.value })}
+                  placeholder="0.00"
+                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
+                    showError('usage')
+                      ? 'border-red-400 bg-red-50/50'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('usage') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.usage}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Unit of Measure <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.unit}
+                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {currentCat.units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Net, VAT Rate (20%, 5%, 0%), VAT (£), Gross (£ GBP) */}
+            <div className="pt-3 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-5 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Net (£) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={form.netCost}
+                  onBlur={() => markTouched('netCost')}
+                  onChange={(e) =>
+                    handleNetOrVatChange(e.target.value, form.vatRate)
+                  }
+                  placeholder="0.00"
+                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
+                    showError('netCost')
+                      ? 'border-red-400 bg-red-50/50'
+                      : 'border-slate-300 bg-white focus:border-slate-900'
+                  }`}
+                />
+                {showError('netCost') && (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    {validation.errors.netCost}
+                  </p>
+                )}
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Energy VAT Rate <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={form.vatRate}
+                  onChange={(e) =>
+                    handleNetOrVatChange(form.netCost, Number(e.target.value))
+                  }
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
+                >
+                  {VAT_RATES.map((vr) => (
+                    <option key={vr.value} value={vr.value}>
+                      {vr.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  VAT (£)
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`£${form.vatAmount}`}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-100 text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Gross (£ GBP)
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`£${form.grossCost}`}
+                  className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-lg bg-slate-900 text-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Invoice PDF Attachment (Stored in Database) & Audit Notes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Source Invoice PDF (Stored in Database)
+              </label>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={handlePdfUpload}
+                className="hidden"
+              />
+              {!form.pdfAttachment ? (
+                <button
+                  type="button"
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="w-full px-3 py-2.5 border border-dashed border-slate-300 hover:border-slate-500 rounded-lg bg-slate-50/60 hover:bg-slate-100/70 text-xs text-slate-600 flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Attach Invoice PDF (max 5 MB)</span>
+                </button>
+              ) : (
+                <div className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-slate-700 shrink-0" />
+                    <div className="truncate">
+                      <div className="text-xs font-medium text-slate-900 truncate">
+                        {form.pdfAttachment.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {((form.pdfAttachment.size || 0) / 1024).toFixed(1)} KB ·
+                        Stored in DB
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handlePreviewPdf}
+                      className="p-1 text-slate-600 hover:text-slate-900 rounded"
+                      title="Open PDF in new tab"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, pdfAttachment: null }));
+                        if (pdfInputRef.current) pdfInputRef.current.value = '';
+                      }}
+                      className="p-1 text-slate-500 hover:text-red-600 rounded"
+                      title="Remove PDF"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {pdfError && (
+                <p className="mt-1 text-[11px] text-red-600">{pdfError}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Audit Notes / Meter Reference
+              </label>
+              <input
+                type="text"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Optional MPAN / MPRN or reference note..."
+                className="w-full px-3 py-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+              />
+            </div>
+          </div>
+
+          {/* Live Calculated ESG Summary Bar */}
+          <div className="p-4 rounded-xl bg-slate-950 text-white flex flex-wrap items-center justify-between gap-4 border border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
+                  {liveMetrics.scope} Calculation
+                </span>
+                {validation.isValid ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Data Verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded">
+                    Awaiting Required Fields
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5 ">
+                {liveMetrics.effectiveFactorLabel}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 text-right ">
+              {form.category !== 'water' ? (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                    Normalized Energy
+                  </div>
+                  <div className="text-sm font-semibold text-white">
+                    <AnimatedNumber
+                      value={liveMetrics.normalizedEnergyKwh}
+                      decimals={1}
+                      suffix=" kWh"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                    Normalized Volume
+                  </div>
+                  <div className="text-sm font-semibold text-white">
+                    <AnimatedNumber
+                      value={liveMetrics.normalizedWaterM3}
+                      decimals={2}
+                      suffix=" m³"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  GHG Footprint
+                </div>
+                <div className="text-base font-bold text-teal-400">
+                  <AnimatedNumber
+                    value={liveMetrics.co2eTonnes}
+                    decimals={3}
+                    suffix=" tCO₂e"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit Footer */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <span className="text-[11px] text-slate-400">
+              All fields marked with <span className="text-red-500">*</span> are
+              mandatory for ESG audit integrity.
+            </span>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors"
+              >
+                {editingInvoice ? 'Save Amended Record' : 'Commit Invoice Entry'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
+// --- File: InvoiceTable.jsx ---
+
+function InvoiceTable({
+  invoices,
+  onAddInvoice,
+  onEditInvoice,
+  onDuplicateInvoice,
+  onDeleteInvoice,
+  onBulkImport,
+  isOwnerUnlocked = false,
+  onRequestOwnerUnlock,
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [siteFilter, setSiteFilter] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [readingFilter, setReadingFilter] = useState('all');
+  const [importError, setImportError] = useState('');
+  const [viewingPdfInvoice, setViewingPdfInvoice] = useState(null);
+  const [activePdfBlobUrl, setActivePdfBlobUrl] = useState(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!viewingPdfInvoice?.pdfAttachment?.dataUrl) {
+      setActivePdfBlobUrl(null);
+      return;
+    }
+    const url = createPdfBlobUrl(viewingPdfInvoice.pdfAttachment.dataUrl);
+    setActivePdfBlobUrl(url);
+    return () => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [viewingPdfInvoice]);
+
+  const filtered = useMemo(() => {
+    return invoices
+      .filter((inv) => {
+        const invSite = inv.siteName || inv.facility || '';
+        const invReading = inv.readingType || 'Actual';
+
+        if (categoryFilter !== 'all' && inv.category !== categoryFilter) {
+          return false;
+        }
+        if (siteFilter !== 'all' && invSite !== siteFilter) {
+          return false;
+        }
+        if (supplierFilter !== 'all' && inv.supplier !== supplierFilter) {
+          return false;
+        }
+        if (readingFilter !== 'all' && invReading !== readingFilter) {
+          return false;
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const hay = [
+            inv.invoiceNumber,
+            inv.invoiceDate,
+            inv.supplier,
+            invSite,
+            inv.notes,
+            inv.pdfAttachment?.name,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) =>
+        (b.billingPeriodStart || '').localeCompare(a.billingPeriodStart || '')
+      );
+  }, [
+    invoices,
+    categoryFilter,
+    siteFilter,
+    supplierFilter,
+    readingFilter,
+    searchQuery,
+  ]);
+
+  const handleDownloadCsv = () => {
+    const csvContent = exportInvoicesToCsv(filtered);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `uk-esg-utility-invoices-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = () => {
+    const sampleTemplate = [
+      'Invoice Number,Invoice Date,Site Name,Supplier,Category,Billing Start,Billing End,Usage,Unit,Net Cost,VAT Rate,Reading Type,Notes',
+      'INV-2026-001,2026-02-03,Head Office London,Octopus,Electricity,2026-01-01,2026-01-31,14500,kWh,3190.00,20,Actual,January electricity bill',
+      'INV-2026-002,2026-02-04,Office Sheffield,EDF,Natural Gas,2026-01-01,2026-01-31,4200,kWh,336.00,5,Actual,De minimis 5% VAT rate',
+      'INV-2026-003,2026-02-05,Office Leeds,EON,Electricity,2026-01-01,2026-01-31,8900,kWh,1958.00,20,Estimated,Estimated meter reading',
+    ].join('\n');
+
+    const blob = new Blob([sampleTemplate], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'uk-esg-invoice-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileUpload = (e) => {
+    setImportError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = String(event.target?.result || '');
+        const parsed = parseCsvToInvoices(text);
+        if (parsed.length === 0) {
+          setImportError('No valid invoice rows found in CSV.');
+          return;
+        }
+        onBulkImport(parsed);
+      } catch (err) {
+        setImportError(err.message || 'Failed to parse CSV file.');
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const getCategoryIcon = (cat) => {
+    if (cat === 'electricity')
+      return <Zap className="w-3.5 h-3.5 text-slate-700 shrink-0" />;
+    if (cat === 'natural_gas')
+      return <Flame className="w-3.5 h-3.5 text-amber-700 shrink-0" />;
+    return <Droplets className="w-3.5 h-3.5 text-cyan-700 shrink-0" />;
+  };
+
+  return (
+    <div className="space-y-5 animate-fade-in">
+      {/* Section Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
+            Audit Ledger & Document Archive
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 mt-0.5">
+            <RevealText text="Utility Invoices & Meter Records" />
+          </h1>
+        </div>
+
+        {/* Legacy Excel Spreadsheet Ingestion Notice (Disabled for Testing Phase) */}
+        <div className="flex items-center gap-2.5 bg-slate-100/90 border border-slate-200/90 rounded-lg px-3 py-2">
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 cursor-not-allowed select-none"
+            title="Legacy Excel (.xlsx / .xls) workbook upload is disabled during the current testing phase"
+          >
+            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
+          </button>
+          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
+            Testing Phase · Locked
+          </span>
+        </div>
+      </div>
+
+      {/* Filter & Actions Bar */}
+      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter by invoice ref, date, supplier, site name, or PDF filename..."
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 transition-colors"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isOwnerUnlocked && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  title="Download CSV template"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  CSV Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import CSV
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleDownloadCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV ({filtered.length})
+            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={onAddInvoice}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Log Utility Invoice
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestOwnerUnlock}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+                title="Data input and edits are restricted to the repository owner (Mhutt97)"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                Read-Only · Owner Unlock
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400">
+              Stream:
+            </span>
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'electricity', label: 'Electricity (Scope 2)' },
+              { id: 'natural_gas', label: 'Natural Gas (Scope 1)' },
+              { id: 'water', label: 'Water' },
+            ].map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoryFilter(c.id)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  categoryFilter === c.id
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400">
+              Site:
+            </span>
+            <select
+              value={siteFilter}
+              onChange={(e) => setSiteFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+            >
+              <option value="all">All Sites</option>
+              {SITES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
+              Supplier:
+            </span>
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+            >
+              <option value="all">All Suppliers</option>
+              {SUPPLIERS.map((sup) => (
+                <option key={sup} value={sup}>
+                  {sup}
+                </option>
+              ))}
+            </select>
+
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
+              Reading:
+            </span>
+            <select
+              value={readingFilter}
+              onChange={(e) => setReadingFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+            >
+              <option value="all">All Readings</option>
+              {READING_TYPES.map((rt) => (
+                <option key={rt} value={rt}>
+                  {rt}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {importError && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+            {importError}
+          </div>
+        )}
+      </div>
+
+      {/* Invoices Table */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-[0.1em] text-slate-500">
+                <th className="py-3 px-4">Invoice Ref & Tax Date</th>
+                <th className="py-3 px-4">Site Name & Provider</th>
+                <th className="py-3 px-4">Stream</th>
+                <th className="py-3 px-4 text-right">Usage</th>
+                <th className="py-3 px-4 text-right">GHG (tCO₂e)</th>
+                <th className="py-3 px-4 text-right">Net (£)</th>
+                <th className="py-3 px-4 text-right">VAT (£)</th>
+                <th className="py-3 px-4 text-right">Gross (£ GBP)</th>
+                <th className="py-3 px-4">Reading</th>
+                <th className="py-3 px-4">PDF Invoice</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200/80 text-xs">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={11}
+                    className="py-14 text-center text-slate-400 text-xs"
+                  >
+                    <div className="font-medium text-slate-600">
+                      No utility invoice records in the ledger
+                    </div>
+                    <p className="text-slate-400 mt-1">
+                      Log a utility invoice or import a verified CSV file to
+                      populate the ledger.
+                    </p>
+                    {isOwnerUnlocked ? (
+                      <button
+                        type="button"
+                        onClick={onAddInvoice}
+                        className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
+                      >
+                        + Log Utility Invoice
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onRequestOwnerUnlock}
+                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 text-slate-200 font-semibold hover:bg-slate-800 transition-colors"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        Owner Unlock to Add Data
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((inv) => {
+                  const m = calculateInvoiceEsgMetrics(inv);
+                  const catName =
+                    UTILITY_CATEGORIES[inv.category]?.name || inv.category;
+                  const siteName = inv.siteName || inv.facility || SITES[0];
+                  const usageVal = Number(inv.usage ?? inv.quantity) || 0;
+                  const netVal = Number(inv.netCost ?? inv.cost) || 0;
+                  const vatRateVal =
+                    inv.vatRate !== undefined ? Number(inv.vatRate) : 20;
+                  const vatAmtVal =
+                    inv.vatAmount !== undefined
+                      ? Number(inv.vatAmount)
+                      : netVal * (vatRateVal / 100);
+                  const grossVal =
+                    inv.grossCost !== undefined
+                      ? Number(inv.grossCost)
+                      : netVal + vatAmtVal;
+                  const readingType = inv.readingType || 'Actual';
+
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-slate-50/90 transition-colors"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-900">
+                          {inv.invoiceNumber}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Issued: {inv.invoiceDate || inv.billingPeriodEnd}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {inv.billingPeriodStart} → {inv.billingPeriodEnd}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-900">
+                          {siteName}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {inv.supplier}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          {getCategoryIcon(inv.category)}
+                          <div>
+                            <div className="font-medium text-slate-800">
+                              {catName}
+                            </div>
+                            <div className="text-[10px] uppercase text-slate-400">
+                              {m.scope}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 text-right tabular-nums">
+                        <div className="font-semibold text-slate-900">
+                          {usageVal.toLocaleString('en-GB')} {inv.unit}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {inv.category !== 'water'
+                            ? `${(m.normalizedEnergyKwh / 1000).toFixed(2)} MWh`
+                            : `${m.normalizedWaterM3.toFixed(1)} m³`}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 text-right tabular-nums">
+                        <span className="font-semibold text-slate-900">
+                          {m.co2eTonnes.toFixed(3)}
+                        </span>{' '}
+                        <span className="text-[10px] text-slate-400">t</span>
+                      </td>
+
+                      <td className="py-3 px-4 text-right tabular-nums text-slate-700">
+                        £
+                        {netVal.toLocaleString('en-GB', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+
+                      <td className="py-3 px-4 text-right tabular-nums">
+                        <div className="text-slate-700">
+                          £
+                          {vatAmtVal.toLocaleString('en-GB', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {vatRateVal}% VAT
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 text-right tabular-nums font-bold text-slate-900">
+                        £
+                        {grossVal.toLocaleString('en-GB', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        {readingType === 'Actual' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
+                            <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                            Actual
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Estimated
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        {inv.pdfAttachment?.dataUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setViewingPdfInvoice(inv)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-800 transition-colors"
+                            title={inv.pdfAttachment.name}
+                          >
+                            <FileText className="w-3 h-3 text-slate-600" />
+                            <span>View PDF</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-300">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4 text-right">
+                        {isOwnerUnlocked ? (
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => onEditInvoice(inv)}
+                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              title="Amend record"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDuplicateInvoice(inv)}
+                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              title="Duplicate invoice"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteInvoice(inv.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              title="Delete invoice"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider select-none"
+                            title="Edits are locked to repository owner (Mhutt97)"
+                          >
+                            <Lock className="w-2.5 h-2.5" />
+                            Locked
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Stored PDF Document Viewer Modal */}
+      {viewingPdfInvoice && viewingPdfInvoice.pdfAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 animate-fade-in">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-5 py-3.5 bg-slate-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="w-4 h-4 text-teal-400 shrink-0" />
+                <div className="truncate">
+                  <div className="text-xs font-semibold truncate">
+                    {viewingPdfInvoice.pdfAttachment.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
+                    {viewingPdfInvoice.siteName} ·{' '}
+                    {viewingPdfInvoice.supplier}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={
+                    activePdfBlobUrl || viewingPdfInvoice.pdfAttachment.dataUrl
+                  }
+                  download={viewingPdfInvoice.pdfAttachment.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Download PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setViewingPdfInvoice(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-100">
+              {activePdfBlobUrl && (
+                <iframe
+                  title={viewingPdfInvoice.pdfAttachment.name}
+                  src={activePdfBlobUrl}
+                  className="w-full h-full border-0"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 // --- File: DashboardView.jsx ---
 
 const SITE_COLORS = {
@@ -1745,6 +3255,8 @@ function DashboardView({
   onSelectYear,
   onOpenNewInvoice,
   onSwitchTab,
+  isOwnerUnlocked = false,
+  onRequestOwnerUnlock,
 }) {
   const [selectedUtility, setSelectedUtility] = useState('all');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
@@ -2089,18 +3601,31 @@ function DashboardView({
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenNewInvoice}
-              className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #0284c7 100%)',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.32)',
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              Log Utility Invoice
-            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={onOpenNewInvoice}
+                className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #2563eb 0%, #0284c7 100%)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.32)',
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Log Utility Invoice
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestOwnerUnlock}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
+                title="Data input and edits are restricted to the repository owner (Mhutt97)"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Read-Only · Owner Unlock</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2966,1400 +4491,6 @@ function DashboardView({
 }
 
 
-// --- File: InvoiceModal.jsx ---
-
-const EMPTY_FORM = {
-  invoiceNumber: '',
-  invoiceDate: '2026-05-02',
-  supplier: SUPPLIERS[0],
-  siteName: SITES[0],
-  category: 'electricity',
-  billingPeriodStart: '2026-04-01',
-  billingPeriodEnd: '2026-04-30',
-  readingType: 'Actual',
-  usage: '',
-  unit: 'kWh',
-  netCost: '',
-  vatRate: 20,
-  vatAmount: '0.00',
-  grossCost: '0.00',
-  currency: 'GBP',
-  notes: '',
-  pdfAttachment: null,
-};
-
-function InvoiceModal({
-  isOpen,
-  onClose,
-  onSave,
-  editingInvoice,
-  existingInvoices = [],
-}) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [touched, setTouched] = useState({});
-  const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [pdfError, setPdfError] = useState('');
-  const pdfInputRef = useRef(null);
-
-  useEffect(() => {
-    setTouched({});
-    setSubmitAttempted(false);
-    setPdfError('');
-
-    if (editingInvoice) {
-      const net = Number(editingInvoice.netCost ?? editingInvoice.cost) || 0;
-      const rate =
-        editingInvoice.vatRate !== undefined
-          ? Number(editingInvoice.vatRate)
-          : 20;
-      const vat =
-        editingInvoice.vatAmount !== undefined
-          ? Number(editingInvoice.vatAmount)
-          : Number((net * (rate / 100)).toFixed(2));
-      const gross =
-        editingInvoice.grossCost !== undefined
-          ? Number(editingInvoice.grossCost)
-          : Number((net + vat).toFixed(2));
-
-      setForm({
-        ...EMPTY_FORM,
-        ...editingInvoice,
-        invoiceDate:
-          editingInvoice.invoiceDate ||
-          editingInvoice.billingPeriodEnd ||
-          '2026-05-02',
-        siteName: editingInvoice.siteName || editingInvoice.facility || SITES[0],
-        supplier: SUPPLIERS.includes(editingInvoice.supplier)
-          ? editingInvoice.supplier
-          : SUPPLIERS[0],
-        readingType: READING_TYPES.includes(editingInvoice.readingType)
-          ? editingInvoice.readingType
-          : 'Actual',
-        usage: editingInvoice.usage ?? editingInvoice.quantity ?? '',
-        netCost: net > 0 ? String(net) : '',
-        vatRate: rate,
-        vatAmount: vat.toFixed(2),
-        grossCost: gross.toFixed(2),
-        currency: 'GBP',
-        pdfAttachment: editingInvoice.pdfAttachment || null,
-      });
-    } else {
-      const todayIso = new Date().toISOString().slice(0, 10);
-      setForm({
-        ...EMPTY_FORM,
-        invoiceDate: todayIso,
-        invoiceNumber: `INV-${new Date().getFullYear()}-${String(
-          Math.floor(1000 + Math.random() * 9000)
-        )}`,
-      });
-    }
-  }, [editingInvoice, isOpen]);
-
-  const validation = useMemo(() => {
-    return validateInvoiceForm(form, existingInvoices, editingInvoice?.id);
-  }, [form, existingInvoices, editingInvoice]);
-
-  const liveMetrics = useMemo(() => {
-    return calculateInvoiceEsgMetrics(form);
-  }, [form]);
-
-  if (!isOpen) return null;
-
-  const currentCat =
-    UTILITY_CATEGORIES[form.category] || UTILITY_CATEGORIES.electricity;
-
-  const markTouched = (field) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-  };
-
-  const showError = (field) =>
-    (touched[field] || submitAttempted) && validation.errors[field];
-
-  const handleCategoryChange = (newCategory) => {
-    const catObj = UTILITY_CATEGORIES[newCategory];
-    setForm((prev) => ({
-      ...prev,
-      category: newCategory,
-      unit: catObj.units[0].id,
-    }));
-  };
-
-  const handleNetOrVatChange = (newNetRaw, newVatRateRaw) => {
-    const netNum = Math.max(0, Number(newNetRaw) || 0);
-    const rateNum = Number(newVatRateRaw);
-    const vatNum = netNum * (rateNum / 100);
-    const grossNum = netNum + vatNum;
-
-    setForm((prev) => ({
-      ...prev,
-      netCost: newNetRaw,
-      vatRate: rateNum,
-      vatAmount: vatNum.toFixed(2),
-      grossCost: grossNum.toFixed(2),
-    }));
-  };
-
-  const handlePdfUpload = (e) => {
-    setPdfError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const isPdf =
-      file.type === 'application/pdf' ||
-      file.name.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      setPdfError('Only PDF documents (.pdf) are permitted for invoice records.');
-      if (pdfInputRef.current) pdfInputRef.current.value = '';
-      return;
-    }
-
-    // 5 MB limit for database/JSON storage
-    const maxBytes = 5 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      setPdfError('PDF file size must be under 5.0 MB for database storage.');
-      if (pdfInputRef.current) pdfInputRef.current.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = String(ev.target?.result || '');
-      setForm((prev) => ({
-        ...prev,
-        pdfAttachment: {
-          name: file.name,
-          size: file.size,
-          type: 'application/pdf',
-          uploadedAt: new Date().toISOString(),
-          dataUrl,
-        },
-      }));
-    };
-    reader.onerror = () => {
-      setPdfError('Failed to read PDF file.');
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handlePreviewPdf = () => {
-    if (!form.pdfAttachment?.dataUrl) return;
-    const blobUrl = createPdfBlobUrl(form.pdfAttachment.dataUrl);
-    if (blobUrl) {
-      window.open(blobUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitAttempted(true);
-
-    if (!validation.isValid || pdfError) {
-      return;
-    }
-
-    const netNum = Number(form.netCost) || 0;
-    const rateNum = Number(form.vatRate);
-    const vatNum = Number((netNum * (rateNum / 100)).toFixed(2));
-    const grossNum = Number((netNum + vatNum).toFixed(2));
-
-    onSave({
-      ...form,
-      id: editingInvoice?.id || `inv-${Date.now()}`,
-      invoiceNumber: String(form.invoiceNumber).trim(),
-      usage: Number(form.usage),
-      netCost: netNum,
-      vatRate: rateNum,
-      vatAmount: vatNum,
-      grossCost: grossNum,
-      currency: 'GBP',
-    });
-  };
-
-  const errorList = Object.values(validation.errors);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
-        {/* Editorial Header */}
-        <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                Ledger Entry Form
-              </span>
-              <span className="text-slate-700">•</span>
-              <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
-                UK DEFRA Verified
-              </span>
-            </div>
-            <h2 className="text-base font-semibold tracking-tight mt-0.5">
-              {editingInvoice
-                ? 'Amend Utility Invoice Record'
-                : 'Log Utility Invoice'}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
-        >
-          {/* Validation Error Banner (shown if submit attempted with errors) */}
-          {submitAttempted && errorList.length > 0 && (
-            <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-900 space-y-1 animate-fade-in">
-              <div className="font-semibold flex items-center gap-1.5 text-red-800">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>
-                  Please resolve {errorList.length} verification{' '}
-                  {errorList.length === 1 ? 'issue' : 'issues'} before saving:
-                </span>
-              </div>
-              <ul className="list-disc list-inside pl-5 text-red-700 space-y-0.5">
-                {errorList.map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* 1. Utility Category Selector */}
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
-              01 · Utility Stream
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {[
-                {
-                  id: 'electricity',
-                  title: 'Electricity',
-                  sub: 'Scope 2 · kWh / MWh',
-                  icon: Zap,
-                },
-                {
-                  id: 'natural_gas',
-                  title: 'Natural Gas & Fuels',
-                  sub: 'Scope 1 · kWh / m³',
-                  icon: Flame,
-                },
-                {
-                  id: 'water',
-                  title: 'Water & Wastewater',
-                  sub: 'Water · m³ / kL',
-                  icon: Droplets,
-                },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isSelected = form.category === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleCategoryChange(item.id)}
-                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition-all ${
-                      isSelected
-                        ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
-                        : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
-                    }`}
-                  >
-                    <Icon
-                      className={`w-4 h-4 mt-0.5 shrink-0 ${
-                        isSelected ? 'text-teal-400' : 'text-slate-400'
-                      }`}
-                    />
-                    <div>
-                      <div className="text-xs font-semibold">{item.title}</div>
-                      <div
-                        className={`text-[11px] ${
-                          isSelected ? 'text-slate-300' : 'text-slate-400'
-                        }`}
-                      >
-                        {item.sub}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 2. Invoice Reference, Utilities Provider, Site Name */}
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
-              02 · Account & Site Allocation
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Invoice Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.invoiceNumber}
-                  onBlur={() => markTouched('invoiceNumber')}
-                  onChange={(e) =>
-                    setForm({ ...form, invoiceNumber: e.target.value })
-                  }
-                  placeholder="e.g. INV-2026-001"
-                  className={`w-full px-3 py-2 text-xs border rounded-lg focus:outline-none transition-colors ${
-                    showError('invoiceNumber')
-                      ? 'border-red-400 bg-red-50/40 focus:border-red-600'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('invoiceNumber') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.invoiceNumber}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Utilities Provider <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.supplier}
-                  onBlur={() => markTouched('supplier')}
-                  onChange={(e) =>
-                    setForm({ ...form, supplier: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
-                >
-                  {SUPPLIERS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Site Name <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.siteName}
-                  onBlur={() => markTouched('siteName')}
-                  onChange={(e) =>
-                    setForm({ ...form, siteName: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
-                >
-                  {SITES.map((site) => (
-                    <option key={site} value={site}>
-                      {site}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Dates & Reading Type (Invoice Date, Billing Start, Billing End, Reading Type) */}
-          <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
-              03 · Tax Point & Meter Period
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Invoice Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={form.invoiceDate}
-                  onBlur={() => markTouched('invoiceDate')}
-                  onChange={(e) =>
-                    setForm({ ...form, invoiceDate: e.target.value })
-                  }
-                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
-                    showError('invoiceDate')
-                      ? 'border-red-400 bg-red-50/40'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('invoiceDate') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.invoiceDate}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Billing Start <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={form.billingPeriodStart}
-                  onBlur={() => markTouched('billingPeriodStart')}
-                  onChange={(e) =>
-                    setForm({ ...form, billingPeriodStart: e.target.value })
-                  }
-                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
-                    showError('billingPeriodStart')
-                      ? 'border-red-400 bg-red-50/40'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('billingPeriodStart') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.billingPeriodStart}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Billing End <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={form.billingPeriodEnd}
-                  onBlur={() => markTouched('billingPeriodEnd')}
-                  onChange={(e) =>
-                    setForm({ ...form, billingPeriodEnd: e.target.value })
-                  }
-                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
-                    showError('billingPeriodEnd')
-                      ? 'border-red-400 bg-red-50/40'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('billingPeriodEnd') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.billingPeriodEnd}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Reading Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.readingType}
-                  onBlur={() => markTouched('readingType')}
-                  onChange={(e) =>
-                    setForm({ ...form, readingType: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
-                >
-                  {READING_TYPES.map((rt) => (
-                    <option key={rt} value={rt}>
-                      {rt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Usage & Financial Breakdown (£ GBP Net, VAT, Gross) */}
-          <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 space-y-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              04 · Metered Usage & Financial Settlement (£ GBP)
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Usage <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  min="0.01"
-                  required
-                  value={form.usage}
-                  onBlur={() => markTouched('usage')}
-                  onChange={(e) => setForm({ ...form, usage: e.target.value })}
-                  placeholder="0.00"
-                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
-                    showError('usage')
-                      ? 'border-red-400 bg-red-50/50'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('usage') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.usage}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Unit of Measure <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
-                >
-                  {currentCat.units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Net, VAT Rate (20%, 5%, 0%), VAT (£), Gross (£ GBP) */}
-            <div className="pt-3 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-5 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Net (£) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  value={form.netCost}
-                  onBlur={() => markTouched('netCost')}
-                  onChange={(e) =>
-                    handleNetOrVatChange(e.target.value, form.vatRate)
-                  }
-                  placeholder="0.00"
-                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
-                    showError('netCost')
-                      ? 'border-red-400 bg-red-50/50'
-                      : 'border-slate-300 bg-white focus:border-slate-900'
-                  }`}
-                />
-                {showError('netCost') && (
-                  <p className="mt-1 text-[11px] text-red-600">
-                    {validation.errors.netCost}
-                  </p>
-                )}
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Energy VAT Rate <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={form.vatRate}
-                  onChange={(e) =>
-                    handleNetOrVatChange(form.netCost, Number(e.target.value))
-                  }
-                  className="w-full px-3 py-2 text-xs font-medium border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900"
-                >
-                  {VAT_RATES.map((vr) => (
-                    <option key={vr.value} value={vr.value}>
-                      {vr.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  VAT (£)
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`£${form.vatAmount}`}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-100 text-slate-700"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Gross (£ GBP)
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`£${form.grossCost}`}
-                  className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-lg bg-slate-900 text-white"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 5. Invoice PDF Attachment (Stored in Database) & Audit Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Source Invoice PDF (Stored in Database)
-              </label>
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                onChange={handlePdfUpload}
-                className="hidden"
-              />
-              {!form.pdfAttachment ? (
-                <button
-                  type="button"
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="w-full px-3 py-2.5 border border-dashed border-slate-300 hover:border-slate-500 rounded-lg bg-slate-50/60 hover:bg-slate-100/70 text-xs text-slate-600 flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Upload className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Attach Invoice PDF (max 5 MB)</span>
-                </button>
-              ) : (
-                <div className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-slate-700 shrink-0" />
-                    <div className="truncate">
-                      <div className="text-xs font-medium text-slate-900 truncate">
-                        {form.pdfAttachment.name}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {((form.pdfAttachment.size || 0) / 1024).toFixed(1)} KB ·
-                        Stored in DB
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handlePreviewPdf}
-                      className="p-1 text-slate-600 hover:text-slate-900 rounded"
-                      title="Open PDF in new tab"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm((prev) => ({ ...prev, pdfAttachment: null }));
-                        if (pdfInputRef.current) pdfInputRef.current.value = '';
-                      }}
-                      className="p-1 text-slate-500 hover:text-red-600 rounded"
-                      title="Remove PDF"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-              {pdfError && (
-                <p className="mt-1 text-[11px] text-red-600">{pdfError}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Audit Notes / Meter Reference
-              </label>
-              <input
-                type="text"
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Optional MPAN / MPRN or reference note..."
-                className="w-full px-3 py-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
-              />
-            </div>
-          </div>
-
-          {/* Live Calculated ESG Summary Bar */}
-          <div className="p-4 rounded-xl bg-slate-950 text-white flex flex-wrap items-center justify-between gap-4 border border-slate-800">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
-                  {liveMetrics.scope} Calculation
-                </span>
-                {validation.isValid ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Data Verified
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded">
-                    Awaiting Required Fields
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5 ">
-                {liveMetrics.effectiveFactorLabel}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 text-right ">
-              {form.category !== 'water' ? (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    Normalized Energy
-                  </div>
-                  <div className="text-sm font-semibold text-white">
-                    <AnimatedNumber
-                      value={liveMetrics.normalizedEnergyKwh}
-                      decimals={1}
-                      suffix=" kWh"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    Normalized Volume
-                  </div>
-                  <div className="text-sm font-semibold text-white">
-                    <AnimatedNumber
-                      value={liveMetrics.normalizedWaterM3}
-                      decimals={2}
-                      suffix=" m³"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                  GHG Footprint
-                </div>
-                <div className="text-base font-bold text-teal-400">
-                  <AnimatedNumber
-                    value={liveMetrics.co2eTonnes}
-                    decimals={3}
-                    suffix=" tCO₂e"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-            <span className="text-[11px] text-slate-400">
-              All fields marked with <span className="text-red-500">*</span> are
-              mandatory for ESG audit integrity.
-            </span>
-            <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors"
-              >
-                {editingInvoice ? 'Save Amended Record' : 'Commit Invoice Entry'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-
-// --- File: InvoiceTable.jsx ---
-
-function InvoiceTable({
-  invoices,
-  onAddInvoice,
-  onEditInvoice,
-  onDuplicateInvoice,
-  onDeleteInvoice,
-  onBulkImport,
-}) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [siteFilter, setSiteFilter] = useState('all');
-  const [supplierFilter, setSupplierFilter] = useState('all');
-  const [readingFilter, setReadingFilter] = useState('all');
-  const [importError, setImportError] = useState('');
-  const [viewingPdfInvoice, setViewingPdfInvoice] = useState(null);
-  const [activePdfBlobUrl, setActivePdfBlobUrl] = useState(null);
-  const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    if (!viewingPdfInvoice?.pdfAttachment?.dataUrl) {
-      setActivePdfBlobUrl(null);
-      return;
-    }
-    const url = createPdfBlobUrl(viewingPdfInvoice.pdfAttachment.dataUrl);
-    setActivePdfBlobUrl(url);
-    return () => {
-      if (url && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    };
-  }, [viewingPdfInvoice]);
-
-  const filtered = useMemo(() => {
-    return invoices
-      .filter((inv) => {
-        const invSite = inv.siteName || inv.facility || '';
-        const invReading = inv.readingType || 'Actual';
-
-        if (categoryFilter !== 'all' && inv.category !== categoryFilter) {
-          return false;
-        }
-        if (siteFilter !== 'all' && invSite !== siteFilter) {
-          return false;
-        }
-        if (supplierFilter !== 'all' && inv.supplier !== supplierFilter) {
-          return false;
-        }
-        if (readingFilter !== 'all' && invReading !== readingFilter) {
-          return false;
-        }
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const hay = [
-            inv.invoiceNumber,
-            inv.invoiceDate,
-            inv.supplier,
-            invSite,
-            inv.notes,
-            inv.pdfAttachment?.name,
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) =>
-        (b.billingPeriodStart || '').localeCompare(a.billingPeriodStart || '')
-      );
-  }, [
-    invoices,
-    categoryFilter,
-    siteFilter,
-    supplierFilter,
-    readingFilter,
-    searchQuery,
-  ]);
-
-  const handleDownloadCsv = () => {
-    const csvContent = exportInvoicesToCsv(filtered);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `uk-esg-utility-invoices-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadTemplate = () => {
-    const sampleTemplate = [
-      'Invoice Number,Invoice Date,Site Name,Supplier,Category,Billing Start,Billing End,Usage,Unit,Net Cost,VAT Rate,Reading Type,Notes',
-      'INV-2026-001,2026-02-03,Head Office London,Octopus,Electricity,2026-01-01,2026-01-31,14500,kWh,3190.00,20,Actual,January electricity bill',
-      'INV-2026-002,2026-02-04,Office Sheffield,EDF,Natural Gas,2026-01-01,2026-01-31,4200,kWh,336.00,5,Actual,De minimis 5% VAT rate',
-      'INV-2026-003,2026-02-05,Office Leeds,EON,Electricity,2026-01-01,2026-01-31,8900,kWh,1958.00,20,Estimated,Estimated meter reading',
-    ].join('\n');
-
-    const blob = new Blob([sampleTemplate], {
-      type: 'text/csv;charset=utf-8;',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'uk-esg-invoice-import-template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleFileUpload = (e) => {
-    setImportError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = String(event.target?.result || '');
-        const parsed = parseCsvToInvoices(text);
-        if (parsed.length === 0) {
-          setImportError('No valid invoice rows found in CSV.');
-          return;
-        }
-        onBulkImport(parsed);
-      } catch (err) {
-        setImportError(err.message || 'Failed to parse CSV file.');
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const getCategoryIcon = (cat) => {
-    if (cat === 'electricity')
-      return <Zap className="w-3.5 h-3.5 text-slate-700 shrink-0" />;
-    if (cat === 'natural_gas')
-      return <Flame className="w-3.5 h-3.5 text-amber-700 shrink-0" />;
-    return <Droplets className="w-3.5 h-3.5 text-cyan-700 shrink-0" />;
-  };
-
-  return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Section Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Audit Ledger & Document Archive
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 mt-0.5">
-            <RevealText text="Utility Invoices & Meter Records" />
-          </h1>
-        </div>
-
-        {/* Legacy Excel Spreadsheet Ingestion Notice (Disabled for Testing Phase) */}
-        <div className="flex items-center gap-2.5 bg-slate-100/90 border border-slate-200/90 rounded-lg px-3 py-2">
-          <button
-            type="button"
-            disabled
-            className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 cursor-not-allowed select-none"
-            title="Legacy Excel (.xlsx / .xls) workbook upload is disabled during the current testing phase"
-          >
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
-          </button>
-          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
-            Testing Phase · Locked
-          </span>
-        </div>
-      </div>
-
-      {/* Filter & Actions Bar */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by invoice ref, date, supplier, site name, or PDF filename..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 transition-colors"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-              title="Download CSV template"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              CSV Template
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Import CSV
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV ({filtered.length})
-            </button>
-            <button
-              type="button"
-              onClick={onAddInvoice}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Log Utility Invoice
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
-              Stream:
-            </span>
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'electricity', label: 'Electricity (Scope 2)' },
-              { id: 'natural_gas', label: 'Natural Gas (Scope 1)' },
-              { id: 'water', label: 'Water' },
-            ].map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategoryFilter(c.id)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  categoryFilter === c.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 ml-auto">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
-              Site:
-            </span>
-            <select
-              value={siteFilter}
-              onChange={(e) => setSiteFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
-            >
-              <option value="all">All Sites</option>
-              {SITES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
-              Supplier:
-            </span>
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
-            >
-              <option value="all">All Suppliers</option>
-              {SUPPLIERS.map((sup) => (
-                <option key={sup} value={sup}>
-                  {sup}
-                </option>
-              ))}
-            </select>
-
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
-              Reading:
-            </span>
-            <select
-              value={readingFilter}
-              onChange={(e) => setReadingFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
-            >
-              <option value="all">All Readings</option>
-              {READING_TYPES.map((rt) => (
-                <option key={rt} value={rt}>
-                  {rt}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {importError && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
-            {importError}
-          </div>
-        )}
-      </div>
-
-      {/* Invoices Table */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-[0.1em] text-slate-500">
-                <th className="py-3 px-4">Invoice Ref & Tax Date</th>
-                <th className="py-3 px-4">Site Name & Provider</th>
-                <th className="py-3 px-4">Stream</th>
-                <th className="py-3 px-4 text-right">Usage</th>
-                <th className="py-3 px-4 text-right">GHG (tCO₂e)</th>
-                <th className="py-3 px-4 text-right">Net (£)</th>
-                <th className="py-3 px-4 text-right">VAT (£)</th>
-                <th className="py-3 px-4 text-right">Gross (£ GBP)</th>
-                <th className="py-3 px-4">Reading</th>
-                <th className="py-3 px-4">PDF Invoice</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200/80 text-xs">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={11}
-                    className="py-14 text-center text-slate-400 text-xs"
-                  >
-                    <div className="font-medium text-slate-600">
-                      No utility invoice records in the ledger
-                    </div>
-                    <p className="text-slate-400 mt-1">
-                      Log a utility invoice or import a verified CSV file to
-                      populate the ledger.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={onAddInvoice}
-                      className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
-                    >
-                      + Log Utility Invoice
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((inv) => {
-                  const m = calculateInvoiceEsgMetrics(inv);
-                  const catName =
-                    UTILITY_CATEGORIES[inv.category]?.name || inv.category;
-                  const siteName = inv.siteName || inv.facility || SITES[0];
-                  const usageVal = Number(inv.usage ?? inv.quantity) || 0;
-                  const netVal = Number(inv.netCost ?? inv.cost) || 0;
-                  const vatRateVal =
-                    inv.vatRate !== undefined ? Number(inv.vatRate) : 20;
-                  const vatAmtVal =
-                    inv.vatAmount !== undefined
-                      ? Number(inv.vatAmount)
-                      : netVal * (vatRateVal / 100);
-                  const grossVal =
-                    inv.grossCost !== undefined
-                      ? Number(inv.grossCost)
-                      : netVal + vatAmtVal;
-                  const readingType = inv.readingType || 'Actual';
-
-                  return (
-                    <tr
-                      key={inv.id}
-                      className="hover:bg-slate-50/90 transition-colors"
-                    >
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">
-                          {inv.invoiceNumber}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          Issued: {inv.invoiceDate || inv.billingPeriodEnd}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {inv.billingPeriodStart} → {inv.billingPeriodEnd}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">
-                          {siteName}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {inv.supplier}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          {getCategoryIcon(inv.category)}
-                          <div>
-                            <div className="font-medium text-slate-800">
-                              {catName}
-                            </div>
-                            <div className="text-[10px] uppercase text-slate-400">
-                              {m.scope}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <div className="font-semibold text-slate-900">
-                          {usageVal.toLocaleString('en-GB')} {inv.unit}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {inv.category !== 'water'
-                            ? `${(m.normalizedEnergyKwh / 1000).toFixed(2)} MWh`
-                            : `${m.normalizedWaterM3.toFixed(1)} m³`}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <span className="font-semibold text-slate-900">
-                          {m.co2eTonnes.toFixed(3)}
-                        </span>{' '}
-                        <span className="text-[10px] text-slate-400">t</span>
-                      </td>
-
-                      <td className="py-3 px-4 text-right tabular-nums text-slate-700">
-                        £
-                        {netVal.toLocaleString('en-GB', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <div className="text-slate-700">
-                          £
-                          {vatAmtVal.toLocaleString('en-GB', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {vatRateVal}% VAT
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 text-right tabular-nums font-bold text-slate-900">
-                        £
-                        {grossVal.toLocaleString('en-GB', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {readingType === 'Actual' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
-                            <CheckCircle2 className="w-3 h-3 text-teal-600" />
-                            Actual
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            Estimated
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {inv.pdfAttachment?.dataUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => setViewingPdfInvoice(inv)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-800 transition-colors"
-                            title={inv.pdfAttachment.name}
-                          >
-                            <FileText className="w-3 h-3 text-slate-600" />
-                            <span>View PDF</span>
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-slate-300">
-                            —
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                            title="Amend record"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDuplicateInvoice(inv)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                            title="Duplicate invoice"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteInvoice(inv.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="Delete invoice"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Stored PDF Document Viewer Modal */}
-      {viewingPdfInvoice && viewingPdfInvoice.pdfAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 animate-fade-in">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-950 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="w-4 h-4 text-teal-400 shrink-0" />
-                <div className="truncate">
-                  <div className="text-xs font-semibold truncate">
-                    {viewingPdfInvoice.pdfAttachment.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
-                    {viewingPdfInvoice.siteName} ·{' '}
-                    {viewingPdfInvoice.supplier}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={
-                    activePdfBlobUrl || viewingPdfInvoice.pdfAttachment.dataUrl
-                  }
-                  download={viewingPdfInvoice.pdfAttachment.name}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Download PDF
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setViewingPdfInvoice(null)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 bg-slate-100">
-              {activePdfBlobUrl && (
-                <iframe
-                  title={viewingPdfInvoice.pdfAttachment.name}
-                  src={activePdfBlobUrl}
-                  className="w-full h-full border-0"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 // --- File: BackendConfigModal.jsx ---
 
 function BackendConfigModal({
@@ -4370,6 +4501,10 @@ function BackendConfigModal({
   invoices,
   orgProfile,
   onRestoreRemoteData,
+  isOwnerUnlocked = false,
+  verifiedOwnerLogin = null,
+  onOwnerVerified,
+  onLockOwnerSession,
 }) {
   const [config, setConfig] = useState(backendConfig);
   const [activeTab, setActiveTab] = useState(
@@ -4413,16 +4548,26 @@ function BackendConfigModal({
     onSaveConfig(nextConfig);
   };
 
-  const handleGitHubTest = async () => {
+  const handleVerifyOwner = async () => {
     setLoading(true);
     setStatusMsg(null);
     try {
-      const info = await testGitHubConnection(config.github);
+      const verification = await verifyOwnerGitHubAccess(config.github.token);
+      const updated = {
+        ...config,
+        github: {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
+      };
+      handlePersistConfig(updated);
+      if (onOwnerVerified) {
+        onOwnerVerified(config.github.token, verification.ownerLogin);
+      }
       setStatusMsg({
         type: 'success',
-        text: `Connected to ${info.fullName} (default branch: ${
-          info.defaultBranch
-        }). Write permission: ${info.canPush ? 'Verified' : 'Read-Only'}.`,
+        text: `Owner Authenticated (${verification.ownerLogin}) on ${verification.fullName}. Data input, invoice editing, and cloud commits are now unlocked for this browser!`,
       });
     } catch (err) {
       setStatusMsg({ type: 'error', text: err.message });
@@ -4435,20 +4580,36 @@ function BackendConfigModal({
     setLoading(true);
     setStatusMsg(null);
     try {
-      const res = await pushToGitHub(config.github, {
-        invoices,
-        orgProfile,
-        sharedGsheetsUrl: config.gsheets?.webAppUrl || '',
-      });
+      const verification = await verifyOwnerGitHubAccess(config.github.token);
+      if (onOwnerVerified) {
+        onOwnerVerified(config.github.token, verification.ownerLogin);
+      }
+      const res = await pushToGitHub(
+        {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
+        {
+          invoices,
+          orgProfile,
+          sharedGsheetsUrl: config.gsheets?.webAppUrl || '',
+        }
+      );
       const updated = {
         ...config,
         activeMode: 'github',
         lastSyncedAt: new Date().toISOString(),
+        github: {
+          ...config.github,
+          owner: AUTHORIZED_GITHUB_OWNER,
+          repo: AUTHORIZED_GITHUB_REPO,
+        },
       };
       handlePersistConfig(updated);
       setStatusMsg({
         type: 'success',
-        text: `Published ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${config.github.owner}/${config.github.repo} (${config.github.filePath}). All website visitors will now see this data automatically!`,
+        text: `Published ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${AUTHORIZED_GITHUB_OWNER}/${AUTHORIZED_GITHUB_REPO} (${config.github.filePath}). All website visitors can view this data in Read-Only mode!`,
         url: res.htmlUrl,
       });
     } catch (err) {
@@ -4482,6 +4643,13 @@ function BackendConfigModal({
   };
 
   const handleGoogleSheetsPush = async () => {
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Please authenticate as ${AUTHORIZED_GITHUB_OWNER} on the GitHub Repository API tab before syncing to Google Sheets.`,
+      });
+      return;
+    }
     setLoading(true);
     setStatusMsg(null);
     try {
@@ -4504,6 +4672,13 @@ function BackendConfigModal({
   };
 
   const handleGoogleSheetsPull = async () => {
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Please authenticate as ${AUTHORIZED_GITHUB_OWNER} on the GitHub Repository API tab first.`,
+      });
+      return;
+    }
     setLoading(true);
     setStatusMsg(null);
     try {
@@ -4556,6 +4731,14 @@ function BackendConfigModal({
 
   const handleImportJsonFile = (e) => {
     setStatusMsg(null);
+    if (!isOwnerUnlocked) {
+      setStatusMsg({
+        type: 'error',
+        text: `Access Denied: Restoring a JSON snapshot is restricted to repository owner ${AUTHORIZED_GITHUB_OWNER}.`,
+      });
+      if (jsonInputRef.current) jsonInputRef.current.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -4673,6 +4856,53 @@ function BackendConfigModal({
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Owner Access Control Banner */}
+          <div
+            className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+              isOwnerUnlocked
+                ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                : 'bg-amber-50/90 border-amber-200 text-amber-950'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {isOwnerUnlocked ? (
+                <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <div className="text-xs font-extrabold uppercase tracking-wider">
+                  {isOwnerUnlocked
+                    ? `Owner Edit Mode Unlocked (${
+                        verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                      })`
+                    : `Public Read-Only Mode · Locked to ${AUTHORIZED_GITHUB_OWNER}`}
+                </div>
+                <p className="text-xs mt-0.5 opacity-90">
+                  {isOwnerUnlocked
+                    ? 'You are authenticated as the repository owner. You can log invoices, edit records, attach PDFs, and commit updates.'
+                    : `Because this is a public repository, all visitors can view dashboards and invoices in Read-Only mode. Only ${AUTHORIZED_GITHUB_OWNER} can unlock data input and edits using a GitHub Personal Access Token below.`}
+                </p>
+              </div>
+            </div>
+            {isOwnerUnlocked && onLockOwnerSession && (
+              <button
+                type="button"
+                onClick={() => {
+                  onLockOwnerSession();
+                  setStatusMsg({
+                    type: 'success',
+                    text: 'Session locked back to Public Read-Only Mode.',
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shrink-0"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Lock Session
+              </button>
+            )}
+          </div>
+
           {statusMsg && (
             <div
               className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
@@ -4718,27 +4948,25 @@ function BackendConfigModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    GitHub Owner (User or Org) *
+                    Authorized GitHub Owner (Locked)
                   </label>
                   <input
                     type="text"
-                    value={config.github.owner}
-                    onChange={(e) => updateGithub('owner', e.target.value)}
-                    placeholder="Mhutt97"
-                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
+                    value={AUTHORIZED_GITHUB_OWNER}
+                    disabled
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 bg-slate-100 text-slate-500 rounded-xl cursor-not-allowed"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Repository Name *
+                    Authorized Repository (Locked)
                   </label>
                   <input
                     type="text"
-                    value={config.github.repo}
-                    onChange={(e) => updateGithub('repo', e.target.value)}
-                    placeholder="esg-energy-tracker"
-                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
+                    value={AUTHORIZED_GITHUB_REPO}
+                    disabled
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 bg-slate-100 text-slate-500 rounded-xl cursor-not-allowed"
                   />
                 </div>
 
@@ -4771,22 +4999,23 @@ function BackendConfigModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  GitHub Fine-Grained Personal Access Token (PAT) *
+                  Owner GitHub Personal Access Token (PAT for{' '}
+                  {AUTHORIZED_GITHUB_OWNER}) *
                 </label>
                 <input
                   type="password"
                   value={config.github.token}
                   onChange={(e) => updateGithub('token', e.target.value)}
-                  placeholder="github_pat_..."
+                  placeholder="github_pat_... (Required to unlock data input & edits)"
                   className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Stored locally in your browser. Requires{' '}
-                  <strong>Contents: Read and Write</strong> permission on{' '}
-                  <code>
-                    {config.github.owner}/{config.github.repo}
-                  </code>
-                  .
+                  Verified directly against GitHub API for{' '}
+                  <strong>
+                    {AUTHORIZED_GITHUB_OWNER}/{AUTHORIZED_GITHUB_REPO}
+                  </strong>
+                  . Stored only in your own browser&apos;s local storage — never
+                  exposed to other visitors.
                 </p>
               </div>
 
@@ -4794,11 +5023,13 @@ function BackendConfigModal({
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={handleGitHubTest}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50"
+                  onClick={handleVerifyOwner}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50"
                 >
-                  <ShieldCheck className="w-4 h-4 text-blue-600" />
-                  Test Connection
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  {isOwnerUnlocked
+                    ? 'Re-Verify Owner Access'
+                    : `Verify Owner (${AUTHORIZED_GITHUB_OWNER}) & Unlock Edits`}
                 </button>
 
                 <button
@@ -4822,7 +5053,7 @@ function BackendConfigModal({
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
                 >
                   <DownloadCloud className="w-4 h-4" />
-                  Pull from GitHub
+                  Pull Latest from GitHub
                 </button>
               </div>
             </div>
@@ -5015,6 +5246,8 @@ function App() {
   const [backendConfig, setBackendConfig] = useState(
     initialState.backendConfig
   );
+  const [isOwnerUnlocked, setIsOwnerUnlocked] = useState(false);
+  const [verifiedOwnerLogin, setVerifiedOwnerLogin] = useState(null);
   const [hasUnsyncedLocal, setHasUnsyncedLocal] = useState(false);
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -5035,8 +5268,8 @@ function App() {
     toastTimerRef.current = setTimeout(() => setToast(null), 4200);
   };
 
-  // On startup: Hydrate local IndexedDB AND automatically fetch shared database from GitHub Repo / Google Sheets
-  // so every user accessing the website sees the shared invoice data automatically!
+  // On startup: Fetch shared repository database for all visitors, and verify if the current browser
+  // holds an authenticated Owner token for Mhutt97/esg-energy-tracker.
   useEffect(() => {
     let isMounted = true;
 
@@ -5047,60 +5280,47 @@ function App() {
       const remoteRepoData = await fetchSharedRepositoryDatabase(
         initialState.backendConfig.github
       );
+      const remoteInvoices = remoteRepoData?.invoices || [];
 
-      let remoteInvoices = remoteRepoData?.invoices || [];
-      let activeSheetsUrl =
-        initialState.backendConfig.gsheets?.webAppUrl ||
-        remoteRepoData?.sharedGsheetsUrl ||
-        '';
-
-      // If a shared Google Sheets Web App URL is configured (either locally or inside data/esg-invoices.json),
-      // pull the live multi-user rows from Google Sheets as well
-      if (activeSheetsUrl) {
+      // Check if this browser has a stored Owner GitHub Token for Mhutt97
+      let ownerVerified = false;
+      let ownerLogin = null;
+      const storedToken = initialState.backendConfig.github?.token?.trim();
+      if (storedToken) {
         try {
-          const sheetData = await pullFromGoogleSheets({
-            webAppUrl: activeSheetsUrl,
-          });
-          if (
-            Array.isArray(sheetData.invoices) &&
-            sheetData.invoices.length > 0
-          ) {
-            remoteInvoices = mergeRemoteAndLocalInvoices(
-              sheetData.invoices,
-              remoteInvoices
-            );
-          }
-          if (
-            isMounted &&
-            !initialState.backendConfig.gsheets?.webAppUrl &&
-            remoteRepoData?.sharedGsheetsUrl
-          ) {
-            setBackendConfig((prev) => ({
-              ...prev,
-              activeMode: 'gsheets',
-              gsheets: {
-                ...prev.gsheets,
-                webAppUrl: remoteRepoData.sharedGsheetsUrl,
-              },
-            }));
-          }
+          const check = await verifyOwnerGitHubAccess(storedToken);
+          ownerVerified = Boolean(check.verified);
+          ownerLogin = check.ownerLogin;
         } catch (err) {
-          console.warn('Shared Google Sheet fetch skipped:', err);
+          console.warn('Stored token verification skipped:', err);
         }
       }
 
       if (!isMounted) return;
 
-      const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
-      setInvoices(merged);
+      setIsOwnerUnlocked(ownerVerified);
+      setVerifiedOwnerLogin(ownerLogin);
+
+      if (ownerVerified) {
+        // Owner browser: merge remote repository data with any local unsynced owner records
+        const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
+        setInvoices(merged);
+        if (localIdb.length > remoteInvoices.length) {
+          setHasUnsyncedLocal(true);
+        }
+      } else {
+        // Public Read-Only Visitor: display authoritative shared repository invoices
+        // (or fallback to localIdb only if the shared repo hasn't been initialized yet)
+        if (remoteInvoices.length > 0) {
+          setInvoices(remoteInvoices);
+        } else if (localIdb.length > 0) {
+          setInvoices(localIdb);
+        }
+        setHasUnsyncedLocal(false);
+      }
 
       if (remoteRepoData?.orgProfile) {
         setOrgProfile((prev) => ({ ...prev, ...remoteRepoData.orgProfile }));
-      }
-
-      // Check if local browser has invoices that are not yet published in the shared repository
-      if (localIdb.length > remoteInvoices.length) {
-        setHasUnsyncedLocal(true);
       }
     }
 
@@ -5111,28 +5331,38 @@ function App() {
   }, []);
 
   useEffect(() => {
-    saveLocalInvoices(invoices);
-  }, [invoices]);
+    if (isOwnerUnlocked) {
+      saveLocalInvoices(invoices);
+    }
+  }, [invoices, isOwnerUnlocked]);
 
   useEffect(() => {
-    saveLocalOrgProfile(orgProfile);
-  }, [orgProfile]);
+    if (isOwnerUnlocked) {
+      saveLocalOrgProfile(orgProfile);
+    }
+  }, [orgProfile, isOwnerUnlocked]);
 
   useEffect(() => {
     saveBackendConfig(backendConfig);
   }, [backendConfig]);
 
-  // Serialized cloud sync queue to publish changes for all website visitors
+  const handleRequestOwnerUnlock = () => {
+    showToast(
+      `Data input & edits are locked to repository owner (${AUTHORIZED_GITHUB_OWNER}). Enter your GitHub PAT to unlock.`,
+      'info'
+    );
+    setIsBackendModalOpen(true);
+  };
+
+  // Serialized cloud sync queue to publish owner changes for all website visitors
   const triggerAutoSyncIfEnabled = (nextInvoices, nextProfile) => {
+    if (!isOwnerUnlocked) return;
+
     const hasGithubToken = Boolean(backendConfig.github?.token?.trim());
     const hasSheetsUrl = Boolean(backendConfig.gsheets?.webAppUrl?.trim());
 
     if (!hasGithubToken && !hasSheetsUrl) {
       setHasUnsyncedLocal(true);
-      showToast(
-        'Saved in this browser. Click "Publish for All Users" in the top bar to sync to the shared repo.',
-        'info'
-      );
       return;
     }
 
@@ -5161,7 +5391,7 @@ function App() {
           ...prev,
           lastSyncedAt: new Date().toISOString(),
         }));
-        showToast('Published invoice update to shared cloud database');
+        showToast('Published invoice update to shared GitHub repository');
       })
       .catch((err) => {
         setHasUnsyncedLocal(true);
@@ -5170,6 +5400,10 @@ function App() {
   };
 
   const handleSaveInvoice = (invoiceRecord) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     let nextInvoices;
     const exists = invoices.some((i) => i.id === invoiceRecord.id);
     if (exists) {
@@ -5188,6 +5422,10 @@ function App() {
   };
 
   const handleDeleteInvoice = (id) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const target = invoices.find((i) => i.id === id);
     const nextInvoices = invoices.filter((i) => i.id !== id);
     setInvoices(nextInvoices);
@@ -5196,6 +5434,10 @@ function App() {
   };
 
   const handleDuplicateInvoice = (inv) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const copy = {
       ...inv,
       id: `inv-${Date.now()}`,
@@ -5206,6 +5448,10 @@ function App() {
   };
 
   const handleBulkImport = (importedList) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const existingByNumber = new Map(
       invoices.map((inv) => [
         String(inv.invoiceNumber || '')
@@ -5327,70 +5573,89 @@ function App() {
             })}
           </nav>
 
-          {/* Right Cloud Sync & Quick Add Actions */}
+          {/* Right Owner Lock Status & Quick Add Actions */}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                hasUnsyncedLocal
+                isOwnerUnlocked && hasUnsyncedLocal
                   ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-400/50'
+                  : isOwnerUnlocked
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
                   : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
               }`}
-              title="Configure GitHub API or Google Sheets Sync so all website visitors see your invoices"
+              title={
+                isOwnerUnlocked
+                  ? `Owner Unlocked (${
+                      verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                    }) — Click to manage GitHub Sync or Lock Session`
+                  : `Read-Only Mode — Click to authenticate as ${AUTHORIZED_GITHUB_OWNER}`
+              }
             >
-              {hasUnsyncedLocal ? (
+              {isOwnerUnlocked && hasUnsyncedLocal ? (
                 <UploadCloud className="w-3.5 h-3.5 text-amber-300" />
-              ) : backendConfig.activeMode === 'github' ? (
-                <Github className="w-3.5 h-3.5 text-sky-400" />
+              ) : isOwnerUnlocked ? (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
               )}
               <span className="hidden sm:inline">
-                {hasUnsyncedLocal
+                {isOwnerUnlocked && hasUnsyncedLocal
                   ? 'Publish for All Users'
-                  : backendConfig.activeMode === 'github'
-                  ? 'Shared Repo Sync'
-                  : 'Sheets Sync'}
+                  : isOwnerUnlocked
+                  ? `Owner Unlocked (${
+                      verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                    })`
+                  : `Read-Only · Owner Login`}
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setEditingInvoice(null);
-                setIsInvoiceModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Log Invoice</span>
-            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingInvoice(null);
+                  setIsInvoiceModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Log Invoice</span>
+              </button>
+            ) : (
+              <span
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900/60 text-slate-400 border border-slate-800 select-none"
+                title={`Data input and edits are locked to ${AUTHORIZED_GITHUB_OWNER}`}
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span>Edits Locked</span>
+              </span>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Unsynced Local Changes Banner (if user logged invoices locally without configuring cloud token/sheet yet) */}
-      {hasUnsyncedLocal && (
+      {/* Unsynced Local Changes Banner (only shown when Owner is unlocked and has unsynced local changes) */}
+      {isOwnerUnlocked && hasUnsyncedLocal && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2.5 text-xs text-amber-950 no-print">
           <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="font-semibold">
-              <strong>Local Browser Changes Detected:</strong> You have logged
-              invoices in this browser that haven&apos;t been published to the
-              shared repository yet. Other users visiting the website will only
-              see invoices once they are committed to{' '}
-              <code>data/esg-invoices.json</code> or synced to Google Sheets.
+              <strong>Local Owner Changes Detected:</strong> You have logged
+              invoices in this browser that haven&apos;t been committed to{' '}
+              <code>data/esg-invoices.json</code> yet.
             </div>
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
               className="px-3 py-1 rounded-lg bg-amber-900 hover:bg-amber-800 text-white font-bold text-xs shrink-0"
             >
-              Publish to Shared Database →
+              Commit & Publish to GitHub →
             </button>
           </div>
         </div>
@@ -5424,10 +5689,16 @@ function App() {
             selectedYear={selectedYear}
             onSelectYear={setSelectedYear}
             onOpenNewInvoice={() => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
             onSwitchTab={setActiveTab}
+            isOwnerUnlocked={isOwnerUnlocked}
+            onRequestOwnerUnlock={handleRequestOwnerUnlock}
           />
         )}
 
@@ -5435,16 +5706,26 @@ function App() {
           <InvoiceTable
             invoices={invoices}
             onAddInvoice={() => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
             onEditInvoice={(inv) => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(inv);
               setIsInvoiceModalOpen(true);
             }}
             onDuplicateInvoice={handleDuplicateInvoice}
             onDeleteInvoice={handleDeleteInvoice}
             onBulkImport={handleBulkImport}
+            isOwnerUnlocked={isOwnerUnlocked}
+            onRequestOwnerUnlock={handleRequestOwnerUnlock}
           />
         )}
       </main>
@@ -5456,13 +5737,20 @@ function App() {
             UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · OFFICE
             SHEFFIELD · OFFICE LEEDS · OFFICE BRISTOL
           </div>
-          <div>CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS</div>
+          <div>
+            CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS ·{' '}
+            {isOwnerUnlocked
+              ? `OWNER UNLOCKED (${
+                  verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                })`
+              : `PUBLIC READ-ONLY MODE (LOCKED TO ${AUTHORIZED_GITHUB_OWNER})`}
+          </div>
         </div>
       </footer>
 
       {/* Modals */}
       <InvoiceModal
-        isOpen={isInvoiceModalOpen}
+        isOpen={isOwnerUnlocked && isInvoiceModalOpen}
         onClose={() => {
           setIsInvoiceModalOpen(false);
           setEditingInvoice(null);
@@ -5491,14 +5779,43 @@ function App() {
             setOrgProfile((prev) => ({ ...prev, ...remoteProfile }));
           }
         }}
+        isOwnerUnlocked={isOwnerUnlocked}
+        verifiedOwnerLogin={verifiedOwnerLogin}
+        onOwnerVerified={async (token, ownerLogin) => {
+          setIsOwnerUnlocked(true);
+          setVerifiedOwnerLogin(ownerLogin);
+          // Merge any local owner invoices from IndexedDB once unlocked
+          const localIdb = await loadInvoicesFromIndexedDb();
+          if (Array.isArray(localIdb) && localIdb.length > 0) {
+            setInvoices((prev) => {
+              const merged = mergeRemoteAndLocalInvoices(prev, localIdb);
+              if (merged.length > prev.length) {
+                setHasUnsyncedLocal(true);
+              }
+              return merged;
+            });
+          }
+          showToast(
+            `Authenticated as ${ownerLogin} — Data input & edits unlocked`
+          );
+        }}
+        onLockOwnerSession={() => {
+          setIsOwnerUnlocked(false);
+          setVerifiedOwnerLogin(null);
+          setBackendConfig((prev) => ({
+            ...prev,
+            github: { ...prev.github, token: '' },
+          }));
+          showToast('Locked session to Public Read-Only Mode', 'info');
+        }}
       />
     </div>
   );
 }
 
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
     </script>
   </body>
 </html>

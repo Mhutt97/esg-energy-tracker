@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LayoutDashboard,
   Receipt,
-  Cloud,
   Plus,
-  Github,
   UploadCloud,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import DashboardView from './components/DashboardView.jsx';
 import InvoiceTable from './components/InvoiceTable.jsx';
@@ -16,12 +16,13 @@ import {
   loadInvoicesFromIndexedDb,
   fetchSharedRepositoryDatabase,
   mergeRemoteAndLocalInvoices,
+  verifyOwnerGitHubAccess,
   saveLocalInvoices,
   saveLocalOrgProfile,
   saveBackendConfig,
   pushToGitHub,
   pushToGoogleSheets,
-  pullFromGoogleSheets,
+  AUTHORIZED_GITHUB_OWNER,
 } from './services/storageService.js';
 
 export default function App() {
@@ -32,6 +33,8 @@ export default function App() {
   const [backendConfig, setBackendConfig] = useState(
     initialState.backendConfig
   );
+  const [isOwnerUnlocked, setIsOwnerUnlocked] = useState(false);
+  const [verifiedOwnerLogin, setVerifiedOwnerLogin] = useState(null);
   const [hasUnsyncedLocal, setHasUnsyncedLocal] = useState(false);
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -52,8 +55,8 @@ export default function App() {
     toastTimerRef.current = setTimeout(() => setToast(null), 4200);
   };
 
-  // On startup: Hydrate local IndexedDB AND automatically fetch shared database from GitHub Repo / Google Sheets
-  // so every user accessing the website sees the shared invoice data automatically!
+  // On startup: Fetch shared repository database for all visitors, and verify if the current browser
+  // holds an authenticated Owner token for Mhutt97/esg-energy-tracker.
   useEffect(() => {
     let isMounted = true;
 
@@ -64,60 +67,47 @@ export default function App() {
       const remoteRepoData = await fetchSharedRepositoryDatabase(
         initialState.backendConfig.github
       );
+      const remoteInvoices = remoteRepoData?.invoices || [];
 
-      let remoteInvoices = remoteRepoData?.invoices || [];
-      let activeSheetsUrl =
-        initialState.backendConfig.gsheets?.webAppUrl ||
-        remoteRepoData?.sharedGsheetsUrl ||
-        '';
-
-      // If a shared Google Sheets Web App URL is configured (either locally or inside data/esg-invoices.json),
-      // pull the live multi-user rows from Google Sheets as well
-      if (activeSheetsUrl) {
+      // Check if this browser has a stored Owner GitHub Token for Mhutt97
+      let ownerVerified = false;
+      let ownerLogin = null;
+      const storedToken = initialState.backendConfig.github?.token?.trim();
+      if (storedToken) {
         try {
-          const sheetData = await pullFromGoogleSheets({
-            webAppUrl: activeSheetsUrl,
-          });
-          if (
-            Array.isArray(sheetData.invoices) &&
-            sheetData.invoices.length > 0
-          ) {
-            remoteInvoices = mergeRemoteAndLocalInvoices(
-              sheetData.invoices,
-              remoteInvoices
-            );
-          }
-          if (
-            isMounted &&
-            !initialState.backendConfig.gsheets?.webAppUrl &&
-            remoteRepoData?.sharedGsheetsUrl
-          ) {
-            setBackendConfig((prev) => ({
-              ...prev,
-              activeMode: 'gsheets',
-              gsheets: {
-                ...prev.gsheets,
-                webAppUrl: remoteRepoData.sharedGsheetsUrl,
-              },
-            }));
-          }
+          const check = await verifyOwnerGitHubAccess(storedToken);
+          ownerVerified = Boolean(check.verified);
+          ownerLogin = check.ownerLogin;
         } catch (err) {
-          console.warn('Shared Google Sheet fetch skipped:', err);
+          console.warn('Stored token verification skipped:', err);
         }
       }
 
       if (!isMounted) return;
 
-      const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
-      setInvoices(merged);
+      setIsOwnerUnlocked(ownerVerified);
+      setVerifiedOwnerLogin(ownerLogin);
+
+      if (ownerVerified) {
+        // Owner browser: merge remote repository data with any local unsynced owner records
+        const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
+        setInvoices(merged);
+        if (localIdb.length > remoteInvoices.length) {
+          setHasUnsyncedLocal(true);
+        }
+      } else {
+        // Public Read-Only Visitor: display authoritative shared repository invoices
+        // (or fallback to localIdb only if the shared repo hasn't been initialized yet)
+        if (remoteInvoices.length > 0) {
+          setInvoices(remoteInvoices);
+        } else if (localIdb.length > 0) {
+          setInvoices(localIdb);
+        }
+        setHasUnsyncedLocal(false);
+      }
 
       if (remoteRepoData?.orgProfile) {
         setOrgProfile((prev) => ({ ...prev, ...remoteRepoData.orgProfile }));
-      }
-
-      // Check if local browser has invoices that are not yet published in the shared repository
-      if (localIdb.length > remoteInvoices.length) {
-        setHasUnsyncedLocal(true);
       }
     }
 
@@ -128,28 +118,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    saveLocalInvoices(invoices);
-  }, [invoices]);
+    if (isOwnerUnlocked) {
+      saveLocalInvoices(invoices);
+    }
+  }, [invoices, isOwnerUnlocked]);
 
   useEffect(() => {
-    saveLocalOrgProfile(orgProfile);
-  }, [orgProfile]);
+    if (isOwnerUnlocked) {
+      saveLocalOrgProfile(orgProfile);
+    }
+  }, [orgProfile, isOwnerUnlocked]);
 
   useEffect(() => {
     saveBackendConfig(backendConfig);
   }, [backendConfig]);
 
-  // Serialized cloud sync queue to publish changes for all website visitors
+  const handleRequestOwnerUnlock = () => {
+    showToast(
+      `Data input & edits are locked to repository owner (${AUTHORIZED_GITHUB_OWNER}). Enter your GitHub PAT to unlock.`,
+      'info'
+    );
+    setIsBackendModalOpen(true);
+  };
+
+  // Serialized cloud sync queue to publish owner changes for all website visitors
   const triggerAutoSyncIfEnabled = (nextInvoices, nextProfile) => {
+    if (!isOwnerUnlocked) return;
+
     const hasGithubToken = Boolean(backendConfig.github?.token?.trim());
     const hasSheetsUrl = Boolean(backendConfig.gsheets?.webAppUrl?.trim());
 
     if (!hasGithubToken && !hasSheetsUrl) {
       setHasUnsyncedLocal(true);
-      showToast(
-        'Saved in this browser. Click "Publish for All Users" in the top bar to sync to the shared repo.',
-        'info'
-      );
       return;
     }
 
@@ -178,7 +178,7 @@ export default function App() {
           ...prev,
           lastSyncedAt: new Date().toISOString(),
         }));
-        showToast('Published invoice update to shared cloud database');
+        showToast('Published invoice update to shared GitHub repository');
       })
       .catch((err) => {
         setHasUnsyncedLocal(true);
@@ -187,6 +187,10 @@ export default function App() {
   };
 
   const handleSaveInvoice = (invoiceRecord) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     let nextInvoices;
     const exists = invoices.some((i) => i.id === invoiceRecord.id);
     if (exists) {
@@ -205,6 +209,10 @@ export default function App() {
   };
 
   const handleDeleteInvoice = (id) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const target = invoices.find((i) => i.id === id);
     const nextInvoices = invoices.filter((i) => i.id !== id);
     setInvoices(nextInvoices);
@@ -213,6 +221,10 @@ export default function App() {
   };
 
   const handleDuplicateInvoice = (inv) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const copy = {
       ...inv,
       id: `inv-${Date.now()}`,
@@ -223,6 +235,10 @@ export default function App() {
   };
 
   const handleBulkImport = (importedList) => {
+    if (!isOwnerUnlocked) {
+      handleRequestOwnerUnlock();
+      return;
+    }
     const existingByNumber = new Map(
       invoices.map((inv) => [
         String(inv.invoiceNumber || '')
@@ -344,70 +360,89 @@ export default function App() {
             })}
           </nav>
 
-          {/* Right Cloud Sync & Quick Add Actions */}
+          {/* Right Owner Lock Status & Quick Add Actions */}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                hasUnsyncedLocal
+                isOwnerUnlocked && hasUnsyncedLocal
                   ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-400/50'
+                  : isOwnerUnlocked
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
                   : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
               }`}
-              title="Configure GitHub API or Google Sheets Sync so all website visitors see your invoices"
+              title={
+                isOwnerUnlocked
+                  ? `Owner Unlocked (${
+                      verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                    }) — Click to manage GitHub Sync or Lock Session`
+                  : `Read-Only Mode — Click to authenticate as ${AUTHORIZED_GITHUB_OWNER}`
+              }
             >
-              {hasUnsyncedLocal ? (
+              {isOwnerUnlocked && hasUnsyncedLocal ? (
                 <UploadCloud className="w-3.5 h-3.5 text-amber-300" />
-              ) : backendConfig.activeMode === 'github' ? (
-                <Github className="w-3.5 h-3.5 text-sky-400" />
+              ) : isOwnerUnlocked ? (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
               )}
               <span className="hidden sm:inline">
-                {hasUnsyncedLocal
+                {isOwnerUnlocked && hasUnsyncedLocal
                   ? 'Publish for All Users'
-                  : backendConfig.activeMode === 'github'
-                  ? 'Shared Repo Sync'
-                  : 'Sheets Sync'}
+                  : isOwnerUnlocked
+                  ? `Owner Unlocked (${
+                      verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                    })`
+                  : `Read-Only · Owner Login`}
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setEditingInvoice(null);
-                setIsInvoiceModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Log Invoice</span>
-            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingInvoice(null);
+                  setIsInvoiceModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Log Invoice</span>
+              </button>
+            ) : (
+              <span
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900/60 text-slate-400 border border-slate-800 select-none"
+                title={`Data input and edits are locked to ${AUTHORIZED_GITHUB_OWNER}`}
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span>Edits Locked</span>
+              </span>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Unsynced Local Changes Banner (if user logged invoices locally without configuring cloud token/sheet yet) */}
-      {hasUnsyncedLocal && (
+      {/* Unsynced Local Changes Banner (only shown when Owner is unlocked and has unsynced local changes) */}
+      {isOwnerUnlocked && hasUnsyncedLocal && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2.5 text-xs text-amber-950 no-print">
           <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="font-semibold">
-              <strong>Local Browser Changes Detected:</strong> You have logged
-              invoices in this browser that haven&apos;t been published to the
-              shared repository yet. Other users visiting the website will only
-              see invoices once they are committed to{' '}
-              <code>data/esg-invoices.json</code> or synced to Google Sheets.
+              <strong>Local Owner Changes Detected:</strong> You have logged
+              invoices in this browser that haven&apos;t been committed to{' '}
+              <code>data/esg-invoices.json</code> yet.
             </div>
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
               className="px-3 py-1 rounded-lg bg-amber-900 hover:bg-amber-800 text-white font-bold text-xs shrink-0"
             >
-              Publish to Shared Database →
+              Commit & Publish to GitHub →
             </button>
           </div>
         </div>
@@ -441,10 +476,16 @@ export default function App() {
             selectedYear={selectedYear}
             onSelectYear={setSelectedYear}
             onOpenNewInvoice={() => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
             onSwitchTab={setActiveTab}
+            isOwnerUnlocked={isOwnerUnlocked}
+            onRequestOwnerUnlock={handleRequestOwnerUnlock}
           />
         )}
 
@@ -452,16 +493,26 @@ export default function App() {
           <InvoiceTable
             invoices={invoices}
             onAddInvoice={() => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(null);
               setIsInvoiceModalOpen(true);
             }}
             onEditInvoice={(inv) => {
+              if (!isOwnerUnlocked) {
+                handleRequestOwnerUnlock();
+                return;
+              }
               setEditingInvoice(inv);
               setIsInvoiceModalOpen(true);
             }}
             onDuplicateInvoice={handleDuplicateInvoice}
             onDeleteInvoice={handleDeleteInvoice}
             onBulkImport={handleBulkImport}
+            isOwnerUnlocked={isOwnerUnlocked}
+            onRequestOwnerUnlock={handleRequestOwnerUnlock}
           />
         )}
       </main>
@@ -473,13 +524,20 @@ export default function App() {
             UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · OFFICE
             SHEFFIELD · OFFICE LEEDS · OFFICE BRISTOL
           </div>
-          <div>CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS</div>
+          <div>
+            CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS ·{' '}
+            {isOwnerUnlocked
+              ? `OWNER UNLOCKED (${
+                  verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                })`
+              : `PUBLIC READ-ONLY MODE (LOCKED TO ${AUTHORIZED_GITHUB_OWNER})`}
+          </div>
         </div>
       </footer>
 
       {/* Modals */}
       <InvoiceModal
-        isOpen={isInvoiceModalOpen}
+        isOpen={isOwnerUnlocked && isInvoiceModalOpen}
         onClose={() => {
           setIsInvoiceModalOpen(false);
           setEditingInvoice(null);
@@ -507,6 +565,35 @@ export default function App() {
           if (remoteProfile) {
             setOrgProfile((prev) => ({ ...prev, ...remoteProfile }));
           }
+        }}
+        isOwnerUnlocked={isOwnerUnlocked}
+        verifiedOwnerLogin={verifiedOwnerLogin}
+        onOwnerVerified={async (token, ownerLogin) => {
+          setIsOwnerUnlocked(true);
+          setVerifiedOwnerLogin(ownerLogin);
+          // Merge any local owner invoices from IndexedDB once unlocked
+          const localIdb = await loadInvoicesFromIndexedDb();
+          if (Array.isArray(localIdb) && localIdb.length > 0) {
+            setInvoices((prev) => {
+              const merged = mergeRemoteAndLocalInvoices(prev, localIdb);
+              if (merged.length > prev.length) {
+                setHasUnsyncedLocal(true);
+              }
+              return merged;
+            });
+          }
+          showToast(
+            `Authenticated as ${ownerLogin} — Data input & edits unlocked`
+          );
+        }}
+        onLockOwnerSession={() => {
+          setIsOwnerUnlocked(false);
+          setVerifiedOwnerLogin(null);
+          setBackendConfig((prev) => ({
+            ...prev,
+            github: { ...prev.github, token: '' },
+          }));
+          showToast('Locked session to Public Read-Only Mode', 'info');
         }}
       />
     </div>

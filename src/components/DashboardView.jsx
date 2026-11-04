@@ -76,6 +76,8 @@ export default function DashboardView({
   onSelectYear,
   onOpenNewInvoice,
   onSwitchTab,
+  isOwnerUnlocked = false,
+  onRequestOwnerUnlock,
 }) {
   const [selectedUtility, setSelectedUtility] = useState('all');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
@@ -420,18 +422,31 @@ export default function DashboardView({
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenNewInvoice}
-              className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #0284c7 100%)',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.32)',
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              Log Utility Invoice
-            </button>
+            {isOwnerUnlocked ? (
+              <button
+                type="button"
+                onClick={onOpenNewInvoice}
+                className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #2563eb 0%, #0284c7 100%)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.32)',
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Log Utility Invoice
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onRequestOwnerUnlock}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
+                title="Data input and edits are restricted to the repository owner (Mhutt97)"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Read-Only · Owner Unlock</span>
+              </button>
+            )}
           </div>
         </div>
 
