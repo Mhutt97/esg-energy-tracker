@@ -164,7 +164,7 @@ export default function InvoiceTable({
       {/* Section Header */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-slate-400">
+          <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
             Audit Ledger & Document Archive
           </div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 mt-0.5">
@@ -183,7 +183,7 @@ export default function InvoiceTable({
             <Lock className="w-3.5 h-3.5 text-slate-400" />
             <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
           </button>
-          <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
+          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
             Testing Phase · Locked
           </span>
         </div>
@@ -252,7 +252,7 @@ export default function InvoiceTable({
         {/* Filter Pills */}
         <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400">
               Stream:
             </span>
             {[
@@ -277,7 +277,7 @@ export default function InvoiceTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 ml-auto">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400">
               Site:
             </span>
             <select
@@ -293,7 +293,7 @@ export default function InvoiceTable({
               ))}
             </select>
 
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 ml-1">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
               Supplier:
             </span>
             <select
@@ -309,7 +309,7 @@ export default function InvoiceTable({
               ))}
             </select>
 
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 ml-1">
+            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
               Reading:
             </span>
             <select
@@ -339,7 +339,7 @@ export default function InvoiceTable({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] font-mono uppercase tracking-[0.1em] text-slate-500">
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-[0.1em] text-slate-500">
                 <th className="py-3 px-4">Invoice Ref & Tax Date</th>
                 <th className="py-3 px-4">Site Name & Provider</th>
                 <th className="py-3 px-4">Stream</th>
@@ -402,13 +402,13 @@ export default function InvoiceTable({
                       className="hover:bg-slate-50/90 transition-colors"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-mono font-semibold text-slate-900">
+                        <div className="font-semibold text-slate-900">
                           {inv.invoiceNumber}
                         </div>
-                        <div className="text-[11px] font-mono text-slate-500">
+                        <div className="text-[11px] text-slate-500">
                           Issued: {inv.invoiceDate || inv.billingPeriodEnd}
                         </div>
-                        <div className="text-[10px] font-mono text-slate-400">
+                        <div className="text-[10px] text-slate-400">
                           {inv.billingPeriodStart} → {inv.billingPeriodEnd}
                         </div>
                       </td>
@@ -429,14 +429,14 @@ export default function InvoiceTable({
                             <div className="font-medium text-slate-800">
                               {catName}
                             </div>
-                            <div className="text-[10px] font-mono uppercase text-slate-400">
+                            <div className="text-[10px] uppercase text-slate-400">
                               {m.scope}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-mono tabular-nums">
+                      <td className="py-3 px-4 text-right tabular-nums">
                         <div className="font-semibold text-slate-900">
                           {usageVal.toLocaleString('en-GB')} {inv.unit}
                         </div>
@@ -447,14 +447,14 @@ export default function InvoiceTable({
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-mono tabular-nums">
+                      <td className="py-3 px-4 text-right tabular-nums">
                         <span className="font-semibold text-slate-900">
                           {m.co2eTonnes.toFixed(3)}
                         </span>{' '}
                         <span className="text-[10px] text-slate-400">t</span>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-700">
+                      <td className="py-3 px-4 text-right tabular-nums text-slate-700">
                         £
                         {netVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
@@ -462,7 +462,7 @@ export default function InvoiceTable({
                         })}
                       </td>
 
-                      <td className="py-3 px-4 text-right font-mono tabular-nums">
+                      <td className="py-3 px-4 text-right tabular-nums">
                         <div className="text-slate-700">
                           £
                           {vatAmtVal.toLocaleString('en-GB', {
@@ -475,7 +475,7 @@ export default function InvoiceTable({
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-slate-900">
+                      <td className="py-3 px-4 text-right tabular-nums font-bold text-slate-900">
                         £
                         {grossVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
@@ -509,7 +509,7 @@ export default function InvoiceTable({
                             <span>View PDF</span>
                           </button>
                         ) : (
-                          <span className="text-[11px] font-mono text-slate-300">
+                          <span className="text-[11px] text-slate-300">
                             —
                           </span>
                         )}
@@ -563,7 +563,7 @@ export default function InvoiceTable({
                   <div className="text-xs font-semibold truncate">
                     {viewingPdfInvoice.pdfAttachment.name}
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400">
+                  <div className="text-[10px] text-slate-400">
                     Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
                     {viewingPdfInvoice.siteName} ·{' '}
                     {viewingPdfInvoice.supplier}

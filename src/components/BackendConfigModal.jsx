@@ -355,7 +355,7 @@ export default function BackendConfigModal({
                   value={config.github.token}
                   onChange={(e) => updateGithub('token', e.target.value)}
                   placeholder="github_pat_..."
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg "
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
                   Stored only in your local browser storage. Requires{' '}
@@ -404,7 +404,7 @@ export default function BackendConfigModal({
                   value={config.gsheets.webAppUrl}
                   onChange={(e) => updateGsheets('webAppUrl', e.target.value)}
                   placeholder="https://script.google.com/macros/s/.../exec"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg "
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
                   Pushes formatted rows + calculated Scope 1 & 2 emissions to
@@ -462,7 +462,7 @@ export default function BackendConfigModal({
                     )}
                   </button>
                 </div>
-                <pre className="p-3 bg-slate-950 text-slate-200 text-[11px] font-mono overflow-x-auto max-h-48 leading-relaxed">
+                <pre className="p-3 bg-slate-950 text-slate-200 text-[11px] overflow-x-auto max-h-48 leading-relaxed">
                   {GOOGLE_APPS_SCRIPT_SNIPPET}
                 </pre>
               </div>

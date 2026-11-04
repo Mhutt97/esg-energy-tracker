@@ -240,11 +240,11 @@ export default function InvoiceModal({
         <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
                 Ledger Entry Form
               </span>
               <span className="text-slate-700">•</span>
-              <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-teal-400">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
                 UK DEFRA Verified
               </span>
             </div>
@@ -365,7 +365,7 @@ export default function InvoiceModal({
                     setForm({ ...form, invoiceNumber: e.target.value })
                   }
                   placeholder="e.g. INV-2026-001"
-                  className={`w-full px-3 py-2 text-xs font-mono border rounded-lg focus:outline-none transition-colors ${
+                  className={`w-full px-3 py-2 text-xs border rounded-lg focus:outline-none transition-colors ${
                     showError('invoiceNumber')
                       ? 'border-red-400 bg-red-50/40 focus:border-red-600'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -438,7 +438,7 @@ export default function InvoiceModal({
                   onChange={(e) =>
                     setForm({ ...form, invoiceDate: e.target.value })
                   }
-                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
                     showError('invoiceDate')
                       ? 'border-red-400 bg-red-50/40'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -463,7 +463,7 @@ export default function InvoiceModal({
                   onChange={(e) =>
                     setForm({ ...form, billingPeriodStart: e.target.value })
                   }
-                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
                     showError('billingPeriodStart')
                       ? 'border-red-400 bg-red-50/40'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -488,7 +488,7 @@ export default function InvoiceModal({
                   onChange={(e) =>
                     setForm({ ...form, billingPeriodEnd: e.target.value })
                   }
-                  className={`w-full px-2.5 py-2 text-xs font-mono border rounded-lg focus:outline-none ${
+                  className={`w-full px-2.5 py-2 text-xs border rounded-lg focus:outline-none ${
                     showError('billingPeriodEnd')
                       ? 'border-red-400 bg-red-50/40'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -543,7 +543,7 @@ export default function InvoiceModal({
                   onBlur={() => markTouched('usage')}
                   onChange={(e) => setForm({ ...form, usage: e.target.value })}
                   placeholder="0.00"
-                  className={`w-full px-3 py-2 text-xs font-mono font-semibold border rounded-lg focus:outline-none ${
+                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
                     showError('usage')
                       ? 'border-red-400 bg-red-50/50'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -591,7 +591,7 @@ export default function InvoiceModal({
                     handleNetOrVatChange(e.target.value, form.vatRate)
                   }
                   placeholder="0.00"
-                  className={`w-full px-3 py-2 text-xs font-mono font-semibold border rounded-lg focus:outline-none ${
+                  className={`w-full px-3 py-2 text-xs font-semibold border rounded-lg focus:outline-none ${
                     showError('netCost')
                       ? 'border-red-400 bg-red-50/50'
                       : 'border-slate-300 bg-white focus:border-slate-900'
@@ -631,7 +631,7 @@ export default function InvoiceModal({
                   type="text"
                   readOnly
                   value={`£${form.vatAmount}`}
-                  className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg bg-slate-100 text-slate-700"
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-100 text-slate-700"
                 />
               </div>
 
@@ -643,7 +643,7 @@ export default function InvoiceModal({
                   type="text"
                   readOnly
                   value={`£${form.grossCost}`}
-                  className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-300 rounded-lg bg-slate-900 text-white"
+                  className="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-lg bg-slate-900 text-white"
                 />
               </div>
             </div>
@@ -679,7 +679,7 @@ export default function InvoiceModal({
                       <div className="text-xs font-medium text-slate-900 truncate">
                         {form.pdfAttachment.name}
                       </div>
-                      <div className="text-[10px] font-mono text-slate-500">
+                      <div className="text-[10px] text-slate-500">
                         {((form.pdfAttachment.size || 0) / 1024).toFixed(1)} KB ·
                         Stored in DB
                       </div>
@@ -731,26 +731,26 @@ export default function InvoiceModal({
           <div className="p-4 rounded-xl bg-slate-950 text-white flex flex-wrap items-center justify-between gap-4 border border-slate-800">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-teal-400">
+                <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
                   {liveMetrics.scope} Calculation
                 </span>
                 {validation.isValid ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
                     <CheckCircle2 className="w-3 h-3" />
                     Data Verified
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-300 bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded">
                     Awaiting Required Fields
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+              <div className="text-[11px] text-slate-400 mt-0.5 ">
                 {liveMetrics.effectiveFactorLabel}
               </div>
             </div>
 
-            <div className="flex items-center gap-6 text-right font-mono">
+            <div className="flex items-center gap-6 text-right ">
               {form.category !== 'water' ? (
                 <div>
                   <div className="text-[10px] uppercase tracking-wider text-slate-400">

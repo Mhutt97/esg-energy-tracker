@@ -2,10 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-sans: "Satoshi", "Satoshi Variable", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --stage-bg: #070d19;
+  --paper: #f8fafc;
+  --card-bg: #ffffff;
+  --mist: #f1f5f9;
+  --ink: #0f172a;
+  --ink-soft: #1e293b;
+  --body-copy: #334155;
+  --mute: #64748b;
+  --line: #e2e8f0;
+  --brand-blue: #2563eb;
+  --brand-sky: #0284c7;
+  --brand-cyan: #0ea5e9;
+  --emerald: #059669;
+  --heading-grad: linear-gradient(92deg, #0f172a 0%, #1e3a8a 55%, #0284c7 100%);
+  --card-shadow: 0 2px 10px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+  --card-hover-shadow: 0 20px 42px -16px rgba(37, 99, 235, 0.14), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  font-family: var(--font-sans) !important;
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, textarea, table, th, td, span, div, p, a, h1, h2, h3, h4, code, kbd, pre {
+  font-family: var(--font-sans) !important;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans) !important;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.text-gradient-heading {
+  background-image: var(--heading-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.card-surface {
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1), border-color 240ms cubic-bezier(0.16, 1, 0.3, 1), transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-surface:hover {
+  box-shadow: var(--card-hover-shadow);
+}
+
 @keyframes wordReveal {
   0% {
     opacity: 0;
-    transform: translateY(65%);
+    transform: translateY(60%);
   }
   100% {
     opacity: 1;
@@ -25,11 +86,11 @@
 }
 
 .animate-word-reveal {
-  animation: wordReveal 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: wordReveal 0.44s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @media print {

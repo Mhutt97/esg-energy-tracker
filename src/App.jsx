@@ -30,7 +30,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedSite, setSelectedSite] = useState('All Sites');
-  const [selectedYear, setSelectedYear] = useState('All Years');
+  const [selectedYear, setSelectedYear] = useState('2026');
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
@@ -125,31 +125,53 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-slate-900">
-      {/* Top Institutional Navigation Bar */}
-      <header className="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-30 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          {/* Brand Identity */}
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded bg-white text-slate-950 flex items-center justify-center font-mono font-bold text-xs tracking-tighter">
+    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-[#0f172a]">
+      {/* Top Sticky Midnight Navy Glass Command Bar (matching ai-news-daily) */}
+      <header
+        className="sticky top-0 z-30 no-print text-white"
+        style={{
+          background: 'rgba(7, 13, 25, 0.90)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          borderBottom: '1px solid rgba(56, 189, 248, 0.14)',
+        }}
+      >
+        <div className="max-w-[1340px] mx-auto px-4 sm:px-6 h-[66px] flex items-center justify-between gap-4">
+          {/* Brand Lockup */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div
+              className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center font-black text-sm tracking-tight text-white shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
+                boxShadow:
+                  '0 4px 14px rgba(37, 99, 235, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+              }}
+            >
               ESG
             </div>
-            <div className="flex items-baseline gap-2.5">
-              <span className="font-semibold text-sm tracking-tight text-white">
-                UK Energy & Emissions Ledger
+            <div className="flex items-center gap-2.5">
+              <span className="text-[18.5px] font-extrabold tracking-[-0.035em] text-white leading-none">
+                UK Energy & ESG Intelligence
               </span>
-              <span className="hidden sm:inline-block text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
-                DEFRA · GBP (£)
+              <span
+                className="hidden sm:inline-flex items-center text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-full"
+                style={{
+                  background: 'rgba(37, 99, 235, 0.18)',
+                  border: '1px solid rgba(96, 165, 250, 0.28)',
+                  color: '#bfdbfe',
+                }}
+              >
+                UK DEFRA · GBP (£)
               </span>
             </div>
           </div>
 
           {/* Center Navigation Tabs */}
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
             {[
               {
                 id: 'dashboard',
-                label: 'Overview',
+                label: 'Site & Monthly Summaries',
                 icon: LayoutDashboard,
               },
               {
@@ -166,20 +188,20 @@ export default function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     active
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{tab.label}</span>
                   {tab.badge !== undefined && (
                     <span
-                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
                         active
-                          ? 'bg-slate-700 text-slate-200'
-                          : 'bg-slate-900 text-slate-400'
+                          ? 'bg-blue-700 text-white'
+                          : 'bg-slate-800 text-slate-300'
                       }`}
                     >
                       {tab.badge}
@@ -191,17 +213,17 @@ export default function App() {
           </nav>
 
           {/* Right Cloud Sync & Quick Add Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-colors"
               title="Configure GitHub API or Google Sheets Sync"
             >
               {backendConfig.activeMode === 'github' ? (
-                <Github className="w-3.5 h-3.5 text-teal-400" />
+                <Github className="w-3.5 h-3.5 text-sky-400" />
               ) : (
-                <Cloud className="w-3.5 h-3.5 text-teal-400" />
+                <Cloud className="w-3.5 h-3.5 text-sky-400" />
               )}
               <span className="hidden sm:inline">
                 {backendConfig.activeMode === 'github'
@@ -218,9 +240,13 @@ export default function App() {
                 setEditingInvoice(null);
                 setIsInvoiceModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-950 transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
+              style={{
+                background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+              }}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Log Invoice</span>
             </button>
           </div>
@@ -231,10 +257,10 @@ export default function App() {
       {toast && (
         <div className="fixed bottom-5 right-5 z-50 no-print animate-fade-in">
           <div
-            className={`px-4 py-2.5 rounded-lg shadow-xl border text-xs font-mono flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 ${
               toast.type === 'error'
-                ? 'bg-red-950 text-red-200 border-red-800'
-                : 'bg-slate-950 text-teal-300 border-slate-800'
+                ? 'bg-rose-950 text-rose-200 border-rose-800'
+                : 'bg-slate-950 text-sky-300 border-slate-800'
             }`}
           >
             <span>{toast.text}</span>
@@ -243,7 +269,7 @@ export default function App() {
       )}
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-7">
+      <main className="flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 py-7">
         {activeTab === 'dashboard' && (
           <DashboardView
             invoices={invoices}
@@ -279,13 +305,13 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200/90 py-3.5 px-6 text-[11px] text-slate-400 font-mono no-print">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <footer className="bg-white border-t border-slate-200/90 py-4 px-6 text-xs font-semibold text-slate-400 no-print">
+        <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-3">
           <div>
-            UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · SHEFFIELD ·
-            LEEDS · BRISTOL
+            UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · OFFICE
+            SHEFFIELD · OFFICE LEEDS · OFFICE BRISTOL
           </div>
-          <div>CURRENCY: GBP (£) · DEFRA CONVERSION STANDARD</div>
+          <div>CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS</div>
         </div>
       </footer>
 
