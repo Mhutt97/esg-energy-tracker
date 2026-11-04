@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   X,
   Github,
@@ -11,12 +11,17 @@ import {
   AlertTriangle,
   Copy,
   Check,
+  ShieldCheck,
+  Upload,
 } from 'lucide-react';
 import {
   pullFromGitHub,
   pushToGitHub,
+  testGitHubConnection,
   pullFromGoogleSheets,
   pushToGoogleSheets,
+  parseJsonBackup,
+  getStorageDiagnostics,
   GOOGLE_APPS_SCRIPT_SNIPPET,
 } from '../services/storageService.js';
 
@@ -36,6 +41,19 @@ export default function BackendConfigModal({
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const [copiedScript, setCopiedScript] = useState(false);
+  const jsonInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setConfig(backendConfig);
+      setStatusMsg(null);
+    }
+  }, [isOpen, backendConfig]);
+
+  const diagnostics = useMemo(
+    () => getStorageDiagnostics(invoices),
+    [invoices]
+  );
 
   if (!isOpen) return null;
 
@@ -58,6 +76,24 @@ export default function BackendConfigModal({
     onSaveConfig(nextConfig);
   };
 
+  const handleGitHubTest = async () => {
+    setLoading(true);
+    setStatusMsg(null);
+    try {
+      const info = await testGitHubConnection(config.github);
+      setStatusMsg({
+        type: 'success',
+        text: `Connected to ${info.fullName} (default branch: ${
+          info.defaultBranch
+        }). Write permission: ${info.canPush ? 'Verified' : 'Read-Only'}.`,
+      });
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGitHubPush = async () => {
     setLoading(true);
     setStatusMsg(null);
@@ -71,7 +107,7 @@ export default function BackendConfigModal({
       handlePersistConfig(updated);
       setStatusMsg({
         type: 'success',
-        text: `Committed ${invoices.length} invoices to ${config.github.owner}/${config.github.repo} (${config.github.filePath}).`,
+        text: `Committed ${invoices.length} invoices (${diagnostics.pdfCount} PDFs) to ${config.github.owner}/${config.github.repo} (${config.github.filePath}).`,
         url: res.htmlUrl,
       });
     } catch (err) {
@@ -95,7 +131,7 @@ export default function BackendConfigModal({
       handlePersistConfig(updated);
       setStatusMsg({
         type: 'success',
-        text: `Loaded ${res.invoices.length} invoices from GitHub repository.`,
+        text: `Loaded ${res.invoices.length} sanitized invoices from GitHub repository.`,
       });
     } catch (err) {
       setStatusMsg({ type: 'error', text: err.message });
@@ -158,6 +194,7 @@ export default function BackendConfigModal({
   const handleExportJson = () => {
     const json = JSON.stringify(
       {
+        schemaVersion: '2.2',
         exportedAt: new Date().toISOString(),
         orgProfile,
         invoices,
@@ -169,24 +206,57 @@ export default function BackendConfigModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `esg-invoices-backup-${new Date()
+    a.download = `uk-esg-ledger-backup-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  const handleImportJsonFile = (e) => {
+    setStatusMsg(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = String(ev.target?.result || '');
+        const restored = parseJsonBackup(text);
+        onRestoreRemoteData(restored.invoices, restored.orgProfile);
+        setStatusMsg({
+          type: 'success',
+          text: `Restored ${restored.invoices.length} invoices from JSON snapshot.`,
+        });
+      } catch (err) {
+        setStatusMsg({
+          type: 'error',
+          text: err.message || 'Failed to parse JSON snapshot.',
+        });
+      } finally {
+        if (jsonInputRef.current) jsonInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div
+          className="px-6 py-4 text-white flex items-center justify-between"
+          style={{
+            background: 'rgba(7, 13, 25, 0.96)',
+            borderBottom: '1px solid rgba(56, 189, 248, 0.16)',
+          }}
+        >
           <div>
-            <h2 className="text-lg font-bold">
-              Cloud Backend Integration (GitHub API & Google Sheets)
+            <h2 className="text-base font-extrabold tracking-tight">
+              Database & Cloud Backend Configuration
             </h2>
             <p className="text-xs text-slate-300">
-              Serverless persistence designed for GitHub Pages static hosting
+              IndexedDB + GitHub REST API + Google Sheets persistence
             </p>
           </div>
           <button
@@ -196,6 +266,18 @@ export default function BackendConfigModal({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Storage Diagnostics Strip */}
+        <div className="px-6 py-2.5 bg-slate-900 text-slate-200 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
+          <span className="font-semibold">
+            Ledger Records: <strong>{diagnostics.invoiceCount}</strong> · Stored
+            PDFs: <strong>{diagnostics.pdfCount}</strong>
+          </span>
+          <span className="text-sky-300 font-bold">
+            Database Size: {diagnostics.totalKb} KB (IndexedDB + LocalStorage
+            Active)
+          </span>
         </div>
 
         {/* Provider Tabs */}
@@ -208,7 +290,7 @@ export default function BackendConfigModal({
             }}
             className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition ${
               activeTab === 'github'
-                ? 'border-emerald-600 text-slate-900 bg-white'
+                ? 'border-blue-600 text-blue-600 bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -224,7 +306,7 @@ export default function BackendConfigModal({
             }}
             className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition ${
               activeTab === 'gsheets'
-                ? 'border-emerald-600 text-slate-900 bg-white'
+                ? 'border-blue-600 text-blue-600 bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -240,37 +322,37 @@ export default function BackendConfigModal({
             }}
             className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg border-b-2 transition ${
               activeTab === 'local'
-                ? 'border-emerald-600 text-slate-900 bg-white'
+                ? 'border-blue-600 text-blue-600 bg-white'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <HardDrive className="w-4 h-4 text-slate-600" />
-            JSON Backup & Auto-Sync
+            JSON Snapshot & Auto-Sync
           </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[78vh] overflow-y-auto">
+        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           {statusMsg && (
             <div
               className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
                 statusMsg.type === 'success'
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-800'
               }`}
             >
               {statusMsg.type === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               )}
               <div className="flex-1">
-                <div className="font-semibold">{statusMsg.text}</div>
+                <div className="font-bold">{statusMsg.text}</div>
                 {statusMsg.url && (
                   <a
                     href={statusMsg.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline text-emerald-700 mt-1 inline-block"
+                    className="underline text-emerald-700 mt-1 inline-block font-semibold"
                   >
                     View committed file on GitHub →
                   </a>
@@ -283,44 +365,44 @@ export default function BackendConfigModal({
           {activeTab === 'github' && (
             <div className="space-y-4">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                <strong>How GitHub API Storage works on GitHub Pages:</strong>{' '}
-                Your browser reads and commits{' '}
-                <code className="px-1 py-0.5 bg-slate-200 rounded text-slate-800">
+                <strong>GitHub Repository Persistence:</strong> Commits{' '}
+                <code className="px-1.5 py-0.5 bg-slate-200/80 rounded font-bold text-slate-800">
                   data/esg-invoices.json
                 </code>{' '}
-                directly to your GitHub repository using the GitHub REST API.
-                Every ESG invoice update gets a full Git commit audit trail.
+                (including attached PDF documents up to 100 MB via Git Blob API
+                fallback and automatic SHA conflict resolution) directly to your
+                GitHub repository.
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     GitHub Owner (User or Org) *
                   </label>
                   <input
                     type="text"
                     value={config.github.owner}
                     onChange={(e) => updateGithub('owner', e.target.value)}
-                    placeholder="e.g. acme-corp"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    placeholder="Mhutt97"
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Repository Name *
                   </label>
                   <input
                     type="text"
                     value={config.github.repo}
                     onChange={(e) => updateGithub('repo', e.target.value)}
-                    placeholder="e.g. esg-energy-tracker"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    placeholder="esg-energy-tracker"
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     Branch Name
                   </label>
                   <input
@@ -328,12 +410,12 @@ export default function BackendConfigModal({
                     value={config.github.branch}
                     onChange={(e) => updateGithub('branch', e.target.value)}
                     placeholder="main"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     JSON File Path in Repo
                   </label>
                   <input
@@ -341,13 +423,13 @@ export default function BackendConfigModal({
                     value={config.github.filePath}
                     onChange={(e) => updateGithub('filePath', e.target.value)}
                     placeholder="data/esg-invoices.json"
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   GitHub Fine-Grained Personal Access Token (PAT) *
                 </label>
                 <input
@@ -355,38 +437,51 @@ export default function BackendConfigModal({
                   value={config.github.token}
                   onChange={(e) => updateGithub('token', e.target.value)}
                   placeholder="github_pat_..."
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg "
+                  className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Stored only in your local browser storage. Requires{' '}
-                  <strong>Contents: Read and Write</strong> permission on the
-                  target repository.
+                  Stored locally in your browser. Requires{' '}
+                  <strong>Contents: Read and Write</strong> permission on{' '}
+                  <code>
+                    {config.github.owner}/{config.github.repo}
+                  </code>
+                  .
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleGitHubTest}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 disabled:opacity-50"
+                >
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  Test Connection
+                </button>
+
                 <button
                   type="button"
                   disabled={loading}
                   onClick={handleGitHubPush}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
                     <UploadCloud className="w-4 h-4" />
                   )}
-                  Commit & Push Invoices to GitHub
+                  Commit & Push to GitHub
                 </button>
 
                 <button
                   type="button"
                   disabled={loading}
                   onClick={handleGitHubPull}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
                 >
                   <DownloadCloud className="w-4 h-4" />
-                  Pull Latest from GitHub
+                  Pull from GitHub
                 </button>
               </div>
             </div>
@@ -396,7 +491,7 @@ export default function BackendConfigModal({
           {activeTab === 'gsheets' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Google Apps Script Web App URL *
                 </label>
                 <input
@@ -404,11 +499,11 @@ export default function BackendConfigModal({
                   value={config.gsheets.webAppUrl}
                   onChange={(e) => updateGsheets('webAppUrl', e.target.value)}
                   placeholder="https://script.google.com/macros/s/.../exec"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg "
+                  className="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl"
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Pushes formatted rows + calculated Scope 1 & 2 emissions to
-                  your Google Sheet&apos;s <code>ESG_Invoices</code> tab.
+                  Uses multi-row 40k-character chunking so large datasets never
+                  exceed Google Sheets&apos; 50,000-character cell limit.
                 </p>
               </div>
 
@@ -417,7 +512,7 @@ export default function BackendConfigModal({
                   type="button"
                   disabled={loading}
                   onClick={handleGoogleSheetsPush}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -431,7 +526,7 @@ export default function BackendConfigModal({
                   type="button"
                   disabled={loading}
                   onClick={handleGoogleSheetsPull}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 disabled:opacity-50"
                 >
                   <DownloadCloud className="w-4 h-4" />
                   Pull from Google Sheet
@@ -442,12 +537,12 @@ export default function BackendConfigModal({
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-slate-100 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
                   <span className="text-xs font-bold text-slate-700">
-                    60-Second Google Sheet Setup (Extensions → Apps Script)
+                    Google Sheet Setup (Extensions → Apps Script)
                   </span>
                   <button
                     type="button"
                     onClick={handleCopyAppsScript}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
                   >
                     {copiedScript ? (
                       <>
@@ -484,7 +579,7 @@ export default function BackendConfigModal({
                       : config.activeMode === 'gsheets'
                       ? 'Google Sheets'
                       : 'your selected cloud backend'}{' '}
-                    whenever you add or edit an invoice
+                    whenever you add, edit, or delete an invoice
                   </div>
                 </div>
                 <input
@@ -496,27 +591,45 @@ export default function BackendConfigModal({
                       autoSync: e.target.checked,
                     })
                   }
-                  className="w-5 h-5 accent-emerald-600 rounded"
+                  className="w-5 h-5 accent-blue-600 rounded"
                 />
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="p-4 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-slate-800">
-                    Download Complete JSON Database Snapshot
+                    Full JSON Database Snapshot (Including PDFs)
                   </div>
                   <div className="text-xs text-slate-500">
-                    Commit this file directly to your repo or keep it as an
-                    offline ESG audit archive
+                    Download or restore a complete offline backup of all
+                    invoices and embedded PDF files
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleExportJson}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800"
-                >
-                  Download JSON
-                </button>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={jsonInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportJsonFile}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => jsonInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-300 text-slate-800 hover:bg-slate-50"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Restore JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800"
+                  >
+                    <DownloadCloud className="w-3.5 h-3.5" />
+                    Download JSON
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -540,7 +653,7 @@ export default function BackendConfigModal({
               onSaveConfig(config);
               onClose();
             }}
-            className="px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
           >
             Save Settings & Close
           </button>

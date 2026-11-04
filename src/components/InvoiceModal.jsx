@@ -20,6 +20,7 @@ import {
   calculateInvoiceEsgMetrics,
   validateInvoiceForm,
 } from '../data/emissionFactors.js';
+import { createPdfBlobUrl } from '../services/storageService.js';
 import { AnimatedNumber } from './AnimatedText.jsx';
 
 const EMPTY_FORM = {
@@ -197,11 +198,9 @@ export default function InvoiceModal({
 
   const handlePreviewPdf = () => {
     if (!form.pdfAttachment?.dataUrl) return;
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        `<iframe src="${form.pdfAttachment.dataUrl}" frameborder="0" style="border:0; top:0; left:0; bottom:0; right:0; width:100%; height:100%;" allowfullscreen></iframe>`
-      );
+    const blobUrl = createPdfBlobUrl(form.pdfAttachment.dataUrl);
+    if (blobUrl) {
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
     }
   };
 

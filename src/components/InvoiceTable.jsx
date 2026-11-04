@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -28,6 +28,7 @@ import {
 import {
   exportInvoicesToCsv,
   parseCsvToInvoices,
+  createPdfBlobUrl,
 } from '../services/storageService.js';
 import { RevealText } from './AnimatedText.jsx';
 
@@ -46,7 +47,22 @@ export default function InvoiceTable({
   const [readingFilter, setReadingFilter] = useState('all');
   const [importError, setImportError] = useState('');
   const [viewingPdfInvoice, setViewingPdfInvoice] = useState(null);
+  const [activePdfBlobUrl, setActivePdfBlobUrl] = useState(null);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!viewingPdfInvoice?.pdfAttachment?.dataUrl) {
+      setActivePdfBlobUrl(null);
+      return;
+    }
+    const url = createPdfBlobUrl(viewingPdfInvoice.pdfAttachment.dataUrl);
+    setActivePdfBlobUrl(url);
+    return () => {
+      if (url && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [viewingPdfInvoice]);
 
   const filtered = useMemo(() => {
     return invoices
@@ -572,7 +588,9 @@ export default function InvoiceTable({
               </div>
               <div className="flex items-center gap-2">
                 <a
-                  href={viewingPdfInvoice.pdfAttachment.dataUrl}
+                  href={
+                    activePdfBlobUrl || viewingPdfInvoice.pdfAttachment.dataUrl
+                  }
                   download={viewingPdfInvoice.pdfAttachment.name}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
                 >
@@ -589,11 +607,13 @@ export default function InvoiceTable({
               </div>
             </div>
             <div className="flex-1 bg-slate-100">
-              <iframe
-                title={viewingPdfInvoice.pdfAttachment.name}
-                src={viewingPdfInvoice.pdfAttachment.dataUrl}
-                className="w-full h-full border-0"
-              />
+              {activePdfBlobUrl && (
+                <iframe
+                  title={viewingPdfInvoice.pdfAttachment.name}
+                  src={activePdfBlobUrl}
+                  className="w-full h-full border-0"
+                />
+              )}
             </div>
           </div>
         </div>

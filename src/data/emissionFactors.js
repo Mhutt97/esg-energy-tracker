@@ -1,5 +1,5 @@
 /**
- * UK DEFRA / DESNZ GHG Conversion Factors & Validation Rules
+ * UK DEFRA / DESNZ GHG Conversion Factors, Normalizers & Validation Engine
  * Configured for UK Business Energy & ESG Invoice Tracking (GBP £)
  */
 
@@ -25,7 +25,7 @@ export const UTILITY_CATEGORIES = {
     id: 'electricity',
     name: 'Electricity',
     scope: 'Scope 2',
-    color: '#0f172a',
+    color: '#2563eb',
     accentColor: '#2563eb',
     kgCo2ePerKwh: 0.207,
     units: [
@@ -45,7 +45,7 @@ export const UTILITY_CATEGORIES = {
     id: 'natural_gas',
     name: 'Natural Gas & Fuels',
     scope: 'Scope 1',
-    color: '#b45309',
+    color: '#d97706',
     accentColor: '#d97706',
     kgCo2ePerKwh: 0.1829,
     units: [
@@ -78,7 +78,7 @@ export const UTILITY_CATEGORIES = {
     id: 'water',
     name: 'Water & Wastewater',
     scope: 'Water',
-    color: '#0e7490',
+    color: '#0891b2',
     accentColor: '#0891b2',
     kgCo2ePerM3: 0.149,
     units: [
@@ -102,17 +102,172 @@ export const UTILITY_CATEGORIES = {
 };
 
 /**
+ * Strips currency symbols (£, $, €), commas, and whitespace to parse numbers reliably
+ */
+export function parseCleanNumber(val, fallback = 0) {
+  if (typeof val === 'number') {
+    return Number.isFinite(val) ? val : fallback;
+  }
+  if (val === null || val === undefined) return fallback;
+  const cleaned = String(val)
+    .replace(/[£$€,\s]/g, '')
+    .trim();
+  if (!cleaned) return fallback;
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+/**
+ * Normalizes UK (DD/MM/YYYY or DD-MM-YYYY) or ISO (YYYY-MM-DD) dates into strict YYYY-MM-DD
+ */
+export function normalizeUkDateToIso(rawDate, fallback = '2026-01-01') {
+  if (!rawDate) return fallback;
+  const str = String(rawDate).trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return str;
+  }
+  // UK DD/MM/YYYY or DD-MM-YYYY
+  const ukMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (ukMatch) {
+    const day = ukMatch[1].padStart(2, '0');
+    const month = ukMatch[2].padStart(2, '0');
+    const year = ukMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return fallback;
+}
+
+/**
+ * Matches free-text site names to canonical UK SITES
+ */
+export function normalizeSiteName(rawSite) {
+  if (!rawSite) return SITES[0];
+  const s = String(rawSite).trim();
+  if (SITES.includes(s)) return s;
+  const lower = s.toLowerCase();
+  if (lower.includes('sheffield')) return 'Office Sheffield';
+  if (lower.includes('leeds')) return 'Office Leeds';
+  if (lower.includes('bristol')) return 'Office Bristol';
+  if (lower.includes('london') || lower.includes('head'))
+    return 'Head Office London';
+  return SITES[0];
+}
+
+/**
+ * Matches free-text supplier names to canonical UK SUPPLIERS
+ */
+export function normalizeSupplierName(rawSupplier) {
+  if (!rawSupplier) return SUPPLIERS[0];
+  const s = String(rawSupplier).trim();
+  if (SUPPLIERS.includes(s)) return s;
+  const lower = s.toLowerCase();
+  if (lower.includes('octopus')) return 'Octopus';
+  if (lower.includes('sse')) return 'SSE';
+  if (lower.includes('eon') || lower.includes('e.on')) return 'EON';
+  if (lower.includes('edf')) return 'EDF';
+  return SUPPLIERS[0];
+}
+
+/**
+ * Normalizes an entire invoice object to guarantee schema consistency across imports and versions
+ */
+export function sanitizeInvoiceRecord(raw, idx = 0) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const rawCat = String(raw.category || 'electricity').toLowerCase();
+  let category = 'electricity';
+  if (
+    rawCat.includes('gas') ||
+    rawCat.includes('fuel') ||
+    rawCat === 'natural_gas'
+  ) {
+    category = 'natural_gas';
+  } else if (rawCat.includes('water')) {
+    category = 'water';
+  }
+
+  const catUnits = UTILITY_CATEGORIES[category].units;
+  const unit = catUnits.some((u) => u.id === raw.unit)
+    ? raw.unit
+    : catUnits[0].id;
+
+  const usage = Math.max(0, parseCleanNumber(raw.usage ?? raw.quantity, 0));
+  const netCost = Math.max(0, parseCleanNumber(raw.netCost ?? raw.cost, 0));
+  const rawVatRate = parseCleanNumber(raw.vatRate, 20);
+  const vatRate = [20, 5, 0].includes(rawVatRate) ? rawVatRate : 20;
+  const vatAmount = Number((netCost * (vatRate / 100)).toFixed(2));
+  const grossCost = Number((netCost + vatAmount).toFixed(2));
+
+  const billingPeriodStart = normalizeUkDateToIso(
+    raw.billingPeriodStart,
+    '2026-01-01'
+  );
+  const billingPeriodEnd = normalizeUkDateToIso(
+    raw.billingPeriodEnd,
+    billingPeriodStart
+  );
+  const invoiceDate = normalizeUkDateToIso(raw.invoiceDate, billingPeriodEnd);
+
+  const readingType =
+    String(raw.readingType || raw.status || '')
+      .toLowerCase()
+      .includes('est')
+      ? 'Estimated'
+      : 'Actual';
+
+  return {
+    id: raw.id || `inv-${Date.now()}-${idx}`,
+    invoiceNumber: String(raw.invoiceNumber || `INV-${1000 + idx}`).trim(),
+    invoiceDate,
+    siteName: normalizeSiteName(raw.siteName || raw.facility),
+    supplier: normalizeSupplierName(raw.supplier),
+    category,
+    billingPeriodStart,
+    billingPeriodEnd,
+    readingType,
+    usage,
+    unit,
+    netCost,
+    vatRate,
+    vatAmount,
+    grossCost,
+    currency: 'GBP',
+    notes: String(raw.notes || '').trim(),
+    pdfAttachment:
+      raw.pdfAttachment && typeof raw.pdfAttachment === 'object'
+        ? {
+            name: String(raw.pdfAttachment.name || 'invoice.pdf'),
+            size: Number(raw.pdfAttachment.size) || 0,
+            type: 'application/pdf',
+            uploadedAt:
+              raw.pdfAttachment.uploadedAt || new Date().toISOString(),
+            dataUrl: raw.pdfAttachment.dataUrl || null,
+          }
+        : null,
+  };
+}
+
+/**
  * Calculates normalized energy (kWh), normalized water (m³), and GHG emissions (tCO2e)
  * using UK DEFRA conversion factors.
  */
 export function calculateInvoiceEsgMetrics(invoice) {
-  const usage = Math.max(0, Number(invoice.usage ?? invoice.quantity) || 0);
-  const category = invoice.category || 'electricity';
+  const usage = Math.max(
+    0,
+    parseCleanNumber(invoice?.usage ?? invoice?.quantity, 0)
+  );
+  const category = invoice?.category || 'electricity';
 
   if (category === 'electricity') {
     const unitObj =
-      UTILITY_CATEGORIES.electricity.units.find((u) => u.id === invoice.unit) ||
-      UTILITY_CATEGORIES.electricity.units[0];
+      UTILITY_CATEGORIES.electricity.units.find(
+        (u) => u.id === invoice?.unit
+      ) || UTILITY_CATEGORIES.electricity.units[0];
     const normalizedEnergyKwh = usage * unitObj.toKwh;
     const factor = UTILITY_CATEGORIES.electricity.kgCo2ePerKwh;
     const co2eTonnes = (normalizedEnergyKwh * factor) / 1000;
@@ -128,8 +283,9 @@ export function calculateInvoiceEsgMetrics(invoice) {
 
   if (category === 'natural_gas') {
     const unitObj =
-      UTILITY_CATEGORIES.natural_gas.units.find((u) => u.id === invoice.unit) ||
-      UTILITY_CATEGORIES.natural_gas.units[0];
+      UTILITY_CATEGORIES.natural_gas.units.find(
+        (u) => u.id === invoice?.unit
+      ) || UTILITY_CATEGORIES.natural_gas.units[0];
     const normalizedEnergyKwh = usage * unitObj.toKwh;
 
     let totalKgCo2e = 0;
@@ -154,7 +310,7 @@ export function calculateInvoiceEsgMetrics(invoice) {
   }
 
   const unitObj =
-    UTILITY_CATEGORIES.water.units.find((u) => u.id === invoice.unit) ||
+    UTILITY_CATEGORIES.water.units.find((u) => u.id === invoice?.unit) ||
     UTILITY_CATEGORIES.water.units[0];
   const normalizedWaterM3 = usage * unitObj.toM3;
   const factorPerM3 = UTILITY_CATEGORIES.water.kgCo2ePerM3;
@@ -252,7 +408,7 @@ export function validateInvoiceForm(
 
   // 5. Usage
   const usageStr = String(form.usage ?? '').trim();
-  const usageVal = Number(usageStr);
+  const usageVal = parseCleanNumber(usageStr, NaN);
   if (usageStr === '' || isNaN(usageVal)) {
     errors.usage = 'Metered usage value is required.';
   } else if (usageVal <= 0) {
@@ -263,7 +419,7 @@ export function validateInvoiceForm(
 
   // 6. Net Cost & VAT
   const netStr = String(form.netCost ?? '').trim();
-  const netVal = Number(netStr);
+  const netVal = parseCleanNumber(netStr, NaN);
   if (netStr === '' || isNaN(netVal)) {
     errors.netCost = 'Net invoice amount (£) is required.';
   } else if (netVal <= 0) {
@@ -286,7 +442,7 @@ export function validateInvoiceForm(
 export const INITIAL_SAMPLE_INVOICES = [];
 
 export const DEFAULT_ORG_PROFILE = {
-  companyName: 'UK Energy & ESG Ledger',
+  companyName: 'UK Energy & ESG Intelligence',
   reportingYear: '2026',
   defaultCurrency: 'GBP',
 };

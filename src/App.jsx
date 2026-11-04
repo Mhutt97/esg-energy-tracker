@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -12,6 +12,7 @@ import InvoiceModal from './components/InvoiceModal.jsx';
 import BackendConfigModal from './components/BackendConfigModal.jsx';
 import {
   loadLocalState,
+  loadInvoicesFromIndexedDb,
   saveLocalInvoices,
   saveLocalOrgProfile,
   saveBackendConfig,
@@ -37,6 +38,22 @@ export default function App() {
   const [isBackendModalOpen, setIsBackendModalOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const syncQueueRef = useRef(Promise.resolve());
+  const toastTimerRef = useRef(null);
+
+  // Hydrate full records (including large PDF attachments) from IndexedDB on startup
+  useEffect(() => {
+    let isMounted = true;
+    loadInvoicesFromIndexedDb().then((idbInvoices) => {
+      if (isMounted && Array.isArray(idbInvoices) && idbInvoices.length > 0) {
+        setInvoices(idbInvoices);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     saveLocalInvoices(invoices);
   }, [invoices]);
@@ -50,35 +67,48 @@ export default function App() {
   }, [backendConfig]);
 
   const showToast = (text, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ text, type });
-    setTimeout(() => setToast(null), 3500);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
   };
 
-  const triggerAutoSyncIfEnabled = async (nextInvoices, nextProfile) => {
+  // Serialized cloud sync queue to prevent concurrent SHA race conditions on GitHub API
+  const triggerAutoSyncIfEnabled = (nextInvoices, nextProfile) => {
     if (!backendConfig.autoSync) return;
-    try {
-      if (
-        backendConfig.activeMode === 'github' &&
-        backendConfig.github?.token
-      ) {
-        await pushToGitHub(backendConfig.github, {
-          invoices: nextInvoices,
-          orgProfile: nextProfile,
-        });
-        showToast('Auto-synced invoices to GitHub repository');
-      } else if (
-        backendConfig.activeMode === 'gsheets' &&
-        backendConfig.gsheets?.webAppUrl
-      ) {
-        await pushToGoogleSheets(backendConfig.gsheets, {
-          invoices: nextInvoices,
-          orgProfile: nextProfile,
-        });
-        showToast('Auto-synced invoices to Google Sheets');
-      }
-    } catch (err) {
-      showToast(`Cloud auto-sync failed: ${err.message}`, 'error');
-    }
+
+    syncQueueRef.current = syncQueueRef.current
+      .then(async () => {
+        if (
+          backendConfig.activeMode === 'github' &&
+          backendConfig.github?.token
+        ) {
+          await pushToGitHub(backendConfig.github, {
+            invoices: nextInvoices,
+            orgProfile: nextProfile,
+          });
+          setBackendConfig((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+          showToast('Auto-synced invoices to GitHub repository');
+        } else if (
+          backendConfig.activeMode === 'gsheets' &&
+          backendConfig.gsheets?.webAppUrl
+        ) {
+          await pushToGoogleSheets(backendConfig.gsheets, {
+            invoices: nextInvoices,
+            orgProfile: nextProfile,
+          });
+          setBackendConfig((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+          showToast('Auto-synced invoices to Google Sheets');
+        }
+      })
+      .catch((err) => {
+        showToast(`Cloud auto-sync failed: ${err.message}`, 'error');
+      });
   };
 
   const handleSaveInvoice = (invoiceRecord) => {
@@ -118,15 +148,42 @@ export default function App() {
   };
 
   const handleBulkImport = (importedList) => {
-    const nextInvoices = [...importedList, ...invoices];
+    const existingByNumber = new Map(
+      invoices.map((inv) => [
+        String(inv.invoiceNumber || '')
+          .trim()
+          .toLowerCase(),
+        inv,
+      ])
+    );
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    importedList.forEach((imp) => {
+      const key = String(imp.invoiceNumber || '')
+        .trim()
+        .toLowerCase();
+      if (existingByNumber.has(key)) {
+        const prev = existingByNumber.get(key);
+        existingByNumber.set(key, { ...prev, ...imp, id: prev.id });
+        updatedCount++;
+      } else {
+        existingByNumber.set(key, imp);
+        addedCount++;
+      }
+    });
+
+    const nextInvoices = Array.from(existingByNumber.values());
     setInvoices(nextInvoices);
-    showToast(`Imported ${importedList.length} utility invoices from CSV`);
+    showToast(
+      `CSV Import complete: ${addedCount} added, ${updatedCount} updated`
+    );
     triggerAutoSyncIfEnabled(nextInvoices, orgProfile);
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-[#0f172a]">
-      {/* Top Sticky Midnight Navy Glass Command Bar (matching ai-news-daily) */}
+      {/* Top Sticky Midnight Navy Glass Command Bar */}
       <header
         className="sticky top-0 z-30 no-print text-white"
         style={{
