@@ -171,59 +171,59 @@ export default function InvoiceTable({
 
   const getCategoryIcon = (cat) => {
     if (cat === 'electricity')
-      return <Zap className="w-3.5 h-3.5 text-slate-700 shrink-0" />;
+      return <Zap className="w-3.5 h-3.5 text-[#121211] shrink-0" />;
     if (cat === 'natural_gas')
-      return <Flame className="w-3.5 h-3.5 text-amber-700 shrink-0" />;
-    return <Droplets className="w-3.5 h-3.5 text-cyan-700 shrink-0" />;
+      return <Flame className="w-3.5 h-3.5 text-[#D9381E] shrink-0" />;
+    return <Droplets className="w-3.5 h-3.5 text-[#1B4332] shrink-0" />;
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Section Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+    <div className="space-y-8 animate-fade-in">
+      {/* Editorial Section Header */}
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#121211]/10 pb-6">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-slate-400">
-            Audit Ledger & Document Archive
+          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
+            02 / Primary Audit Archive
           </div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 mt-0.5">
-            <RevealText text="Utility Invoices & Meter Records" />
+          <h1 className="font-editorial text-4xl sm:text-5xl text-[#121211] mt-1">
+            <RevealText text="Utility Invoices & Verified Meter Ledger" />
           </h1>
         </div>
 
         {/* Legacy Excel Spreadsheet Ingestion Notice (Disabled for Testing Phase) */}
-        <div className="flex items-center gap-2.5 bg-slate-100/90 border border-slate-200/90 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2.5 bg-[#EFECE6]/80 border border-[#121211]/[0.08] rounded-full px-4 py-2">
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 cursor-not-allowed select-none"
+            className="inline-flex items-center gap-2 text-xs font-medium text-[#8C8982] cursor-not-allowed select-none"
             title="Legacy Excel (.xlsx / .xls) workbook upload is disabled during the current testing phase"
           >
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
+            <Lock className="w-3.5 h-3.5 text-[#8C8982]" />
             <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
           </button>
-          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100/80 text-amber-800 border border-amber-300/60">
+          <span className="text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white text-[#575550] border border-[#121211]/10">
             Testing Phase · Locked
           </span>
         </div>
       </div>
 
-      {/* Filter & Actions Bar */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+      {/* Floating Glass Filter & Actions Bar */}
+      <div className="ag-glass rounded-[28px] p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#8C8982] absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by invoice ref, date, supplier, site name, or PDF filename..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900 transition-colors"
+              placeholder="Filter by invoice reference, date, supplier, site name, or PDF filename..."
+              className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-[#121211]/10 rounded-full focus:outline-none focus:border-[#121211] transition-colors"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             {isOwnerUnlocked && (
               <>
                 <input
@@ -236,7 +236,7 @@ export default function InvoiceTable({
                 <button
                   type="button"
                   onClick={handleDownloadTemplate}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#575550] bg-[#EFECE6] hover:bg-[#121211] hover:text-white rounded-full transition-colors"
                   title="Download CSV template"
                 >
                   <FileDown className="w-3.5 h-3.5" />
@@ -245,7 +245,7 @@ export default function InvoiceTable({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#121211] bg-white border border-[#121211]/15 hover:bg-[#EFECE6] rounded-full transition-colors"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Import CSV
@@ -255,7 +255,7 @@ export default function InvoiceTable({
             <button
               type="button"
               onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#121211] bg-white border border-[#121211]/15 hover:bg-[#EFECE6] rounded-full transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Export CSV ({filtered.length})
@@ -264,7 +264,7 @@ export default function InvoiceTable({
               <button
                 type="button"
                 onClick={onAddInvoice}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium text-white bg-[#121211] hover:bg-[#D9381E] rounded-full shadow-sm transition-colors duration-300"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Log Utility Invoice
@@ -273,10 +273,10 @@ export default function InvoiceTable({
               <button
                 type="button"
                 onClick={onRequestOwnerUnlock}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 rounded-lg shadow-2xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium text-white bg-[#121211] hover:bg-[#D9381E] rounded-full shadow-sm transition-colors duration-300"
                 title="Data input and edits are restricted to the repository owner (Mhutt97)"
               >
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <Lock className="w-3.5 h-3.5 text-[#D9381E]" />
                 Read-Only · Owner Unlock
               </button>
             )}
@@ -284,9 +284,9 @@ export default function InvoiceTable({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[#121211]/[0.07] text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] mr-1">
               Stream:
             </span>
             {[
@@ -299,10 +299,10 @@ export default function InvoiceTable({
                 key={c.id}
                 type="button"
                 onClick={() => setCategoryFilter(c.id)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                className={`px-3.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   categoryFilter === c.id
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-[#121211] text-white'
+                    : 'bg-[#EFECE6] text-[#575550] hover:text-[#121211]'
                 }`}
               >
                 {c.label}
@@ -310,14 +310,14 @@ export default function InvoiceTable({
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 ml-auto">
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">
+          <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+            <span className="text-[11px] uppercase tracking-widest text-[#8C8982]">
               Site:
             </span>
             <select
               value={siteFilter}
               onChange={(e) => setSiteFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
             >
               <option value="all">All Sites</option>
               {SITES.map((s) => (
@@ -327,13 +327,13 @@ export default function InvoiceTable({
               ))}
             </select>
 
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
+            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] ml-1">
               Supplier:
             </span>
             <select
               value={supplierFilter}
               onChange={(e) => setSupplierFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
             >
               <option value="all">All Suppliers</option>
               {SUPPLIERS.map((sup) => (
@@ -343,13 +343,13 @@ export default function InvoiceTable({
               ))}
             </select>
 
-            <span className="text-[11px] uppercase tracking-wider text-slate-400 ml-1">
+            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] ml-1">
               Reading:
             </span>
             <select
               value={readingFilter}
               onChange={(e) => setReadingFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-300 rounded-md px-2 py-1 text-xs font-medium"
+              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
             >
               <option value="all">All Readings</option>
               {READING_TYPES.map((rt) => (
@@ -362,42 +362,42 @@ export default function InvoiceTable({
         </div>
 
         {importError && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700">
+          <div className="p-3.5 rounded-2xl bg-[#D9381E]/10 border border-[#D9381E]/25 text-xs text-[#D9381E]">
             {importError}
           </div>
         )}
       </div>
 
-      {/* Invoices Table */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      {/* Invoices Editorial Table */}
+      <div className="ag-card rounded-[28px] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] uppercase tracking-[0.1em] text-slate-500">
-                <th className="py-3 px-4">Invoice Ref & Tax Date</th>
-                <th className="py-3 px-4">Site Name & Provider</th>
-                <th className="py-3 px-4">Stream</th>
-                <th className="py-3 px-4 text-right">Usage</th>
-                <th className="py-3 px-4 text-right">GHG (tCO₂e)</th>
-                <th className="py-3 px-4 text-right">Net (£)</th>
-                <th className="py-3 px-4 text-right">VAT (£)</th>
-                <th className="py-3 px-4 text-right">Gross (£ GBP)</th>
-                <th className="py-3 px-4">Reading</th>
-                <th className="py-3 px-4">PDF Invoice</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="bg-[#EFECE6]/60 border-b border-[#121211]/10 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#575550]">
+                <th className="py-4 px-5">Invoice Ref &amp; Tax Date</th>
+                <th className="py-4 px-4">Site Name &amp; Provider</th>
+                <th className="py-4 px-4">Stream</th>
+                <th className="py-4 px-4 text-right">Usage</th>
+                <th className="py-4 px-4 text-right">GHG (tCO₂e)</th>
+                <th className="py-4 px-4 text-right">Net (£)</th>
+                <th className="py-4 px-4 text-right">VAT (£)</th>
+                <th className="py-4 px-4 text-right">Gross (£ GBP)</th>
+                <th className="py-4 px-4">Reading</th>
+                <th className="py-4 px-4">PDF Dossier</th>
+                <th className="py-4 px-5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200/80 text-xs">
+            <tbody className="divide-y divide-[#121211]/[0.06] text-xs">
               {filtered.length === 0 ? (
                 <tr>
                   <td
                     colSpan={11}
-                    className="py-14 text-center text-slate-400 text-xs"
+                    className="py-16 text-center text-[#8C8982] text-xs"
                   >
-                    <div className="font-medium text-slate-600">
+                    <div className="font-editorial text-2xl text-[#121211]">
                       No utility invoice records in the ledger
                     </div>
-                    <p className="text-slate-400 mt-1">
+                    <p className="text-[#8C8982] mt-1">
                       Log a utility invoice or import a verified CSV file to
                       populate the ledger.
                     </p>
@@ -405,7 +405,7 @@ export default function InvoiceTable({
                       <button
                         type="button"
                         onClick={onAddInvoice}
-                        className="mt-3 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors"
+                        className="mt-4 px-5 py-2 rounded-full bg-[#121211] text-white font-medium hover:bg-[#D9381E] transition-colors"
                       >
                         + Log Utility Invoice
                       </button>
@@ -413,9 +413,9 @@ export default function InvoiceTable({
                       <button
                         type="button"
                         onClick={onRequestOwnerUnlock}
-                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 text-slate-200 font-semibold hover:bg-slate-800 transition-colors"
+                        className="mt-4 inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#121211] text-white font-medium hover:bg-[#D9381E] transition-colors"
                       >
-                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <Lock className="w-3.5 h-3.5 text-[#D9381E]" />
                         Owner Unlock to Add Data
                       </button>
                     )}
@@ -444,62 +444,62 @@ export default function InvoiceTable({
                   return (
                     <tr
                       key={inv.id}
-                      className="hover:bg-slate-50/90 transition-colors"
+                      className="hover:bg-[#EFECE6]/40 transition-colors"
                     >
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">
+                      <td className="py-4 px-5">
+                        <div className="font-semibold text-[#121211]">
                           {inv.invoiceNumber}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-[#575550]">
                           Issued: {inv.invoiceDate || inv.billingPeriodEnd}
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-[10px] text-[#8C8982]">
                           {inv.billingPeriodStart} → {inv.billingPeriodEnd}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">
+                      <td className="py-4 px-4">
+                        <div className="font-medium text-[#121211]">
                           {siteName}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-[#8C8982]">
                           {inv.supplier}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
                           {getCategoryIcon(inv.category)}
                           <div>
-                            <div className="font-medium text-slate-800">
+                            <div className="font-medium text-[#121211]">
                               {catName}
                             </div>
-                            <div className="text-[10px] uppercase text-slate-400">
+                            <div className="text-[10px] uppercase tracking-wider text-[#8C8982]">
                               {m.scope}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <div className="font-semibold text-slate-900">
+                      <td className="py-4 px-4 text-right tabular-nums">
+                        <div className="font-semibold text-[#121211]">
                           {usageVal.toLocaleString('en-GB')} {inv.unit}
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-[10px] text-[#8C8982]">
                           {inv.category !== 'water'
                             ? `${(m.normalizedEnergyKwh / 1000).toFixed(2)} MWh`
                             : `${m.normalizedWaterM3.toFixed(1)} m³`}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <span className="font-semibold text-slate-900">
+                      <td className="py-4 px-4 text-right tabular-nums">
+                        <span className="font-semibold text-[#121211]">
                           {m.co2eTonnes.toFixed(3)}
                         </span>{' '}
-                        <span className="text-[10px] text-slate-400">t</span>
+                        <span className="text-[10px] text-[#8C8982]">t</span>
                       </td>
 
-                      <td className="py-3 px-4 text-right tabular-nums text-slate-700">
+                      <td className="py-4 px-4 text-right tabular-nums text-[#575550]">
                         £
                         {netVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
@@ -507,20 +507,20 @@ export default function InvoiceTable({
                         })}
                       </td>
 
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        <div className="text-slate-700">
+                      <td className="py-4 px-4 text-right tabular-nums">
+                        <div className="text-[#575550]">
                           £
                           {vatAmtVal.toLocaleString('en-GB', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-[10px] text-[#8C8982]">
                           {vatRateVal}% VAT
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right tabular-nums font-bold text-slate-900">
+                      <td className="py-4 px-4 text-right tabular-nums font-semibold text-[#121211]">
                         £
                         {grossVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
@@ -528,45 +528,45 @@ export default function InvoiceTable({
                         })}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         {readingType === 'Actual' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-800 border border-teal-200">
-                            <CheckCircle2 className="w-3 h-3 text-teal-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#1B4332]/10 text-[#1B4332]">
+                            <CheckCircle2 className="w-3 h-3" />
                             Actual
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                            <Clock className="w-3 h-3 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#B45309]/10 text-[#B45309]">
+                            <Clock className="w-3 h-3" />
                             Estimated
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         {inv.pdfAttachment?.dataUrl ? (
                           <button
                             type="button"
                             onClick={() => setViewingPdfInvoice(inv)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 text-[11px] font-medium text-slate-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#121211]/15 bg-white hover:bg-[#121211] hover:text-white text-[11px] font-medium text-[#121211] transition-colors"
                             title={inv.pdfAttachment.name}
                           >
-                            <FileText className="w-3 h-3 text-slate-600" />
+                            <FileText className="w-3 h-3" />
                             <span>View PDF</span>
                           </button>
                         ) : (
-                          <span className="text-[11px] text-slate-300">
+                          <span className="text-[11px] text-[#8C8982]/50">
                             —
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-4 px-5 text-right">
                         {isOwnerUnlocked ? (
                           <div className="inline-flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => onEditInvoice(inv)}
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              className="p-1.5 text-[#575550] hover:text-[#121211] hover:bg-[#EFECE6] rounded-full transition-colors"
                               title="Amend record"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -574,7 +574,7 @@ export default function InvoiceTable({
                             <button
                               type="button"
                               onClick={() => onDuplicateInvoice(inv)}
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                              className="p-1.5 text-[#575550] hover:text-[#121211] hover:bg-[#EFECE6] rounded-full transition-colors"
                               title="Duplicate invoice"
                             >
                               <Copy className="w-3.5 h-3.5" />
@@ -582,7 +582,7 @@ export default function InvoiceTable({
                             <button
                               type="button"
                               onClick={() => onDeleteInvoice(inv.id)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              className="p-1.5 text-[#8C8982] hover:text-[#D9381E] hover:bg-[#D9381E]/10 rounded-full transition-colors"
                               title="Delete invoice"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -590,7 +590,7 @@ export default function InvoiceTable({
                           </div>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider select-none"
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EFECE6] text-[#8C8982] text-[10px] font-medium uppercase tracking-wider select-none"
                             title="Edits are locked to repository owner (Mhutt97)"
                           >
                             <Lock className="w-2.5 h-2.5" />
@@ -609,16 +609,16 @@ export default function InvoiceTable({
 
       {/* Stored PDF Document Viewer Modal */}
       {viewingPdfInvoice && viewingPdfInvoice.pdfAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 animate-fade-in">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-5 py-3.5 bg-slate-950 text-white flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/60 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 bg-[#121211] text-white flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
-                <FileText className="w-4 h-4 text-teal-400 shrink-0" />
+                <FileText className="w-4 h-4 text-[#D9381E] shrink-0" />
                 <div className="truncate">
                   <div className="text-xs font-semibold truncate">
                     {viewingPdfInvoice.pdfAttachment.name}
                   </div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-white/60">
                     Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
                     {viewingPdfInvoice.siteName} ·{' '}
                     {viewingPdfInvoice.supplier}
@@ -631,7 +631,7 @@ export default function InvoiceTable({
                     activePdfBlobUrl || viewingPdfInvoice.pdfAttachment.dataUrl
                   }
                   download={viewingPdfInvoice.pdfAttachment.name}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Download PDF
@@ -639,13 +639,13 @@ export default function InvoiceTable({
                 <button
                   type="button"
                   onClick={() => setViewingPdfInvoice(null)}
-                  className="p-1.5 text-slate-400 hover:text-white rounded-lg"
+                  className="p-1.5 text-white/60 hover:text-white rounded-full"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-slate-100">
+            <div className="flex-1 bg-[#EFECE6]">
               {activePdfBlobUrl && (
                 <iframe
                   title={viewingPdfInvoice.pdfAttachment.name}

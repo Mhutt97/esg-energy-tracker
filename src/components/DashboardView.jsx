@@ -17,38 +17,54 @@ import {
 } from '../data/emissionFactors.js';
 import { AnimatedNumber, RevealText } from './AnimatedText.jsx';
 
-const SITE_COLORS = {
+const SITE_EDITORIAL_META = {
   'Head Office London': {
-    bg: '#2563eb',
-    lightBg: 'rgba(37, 99, 235, 0.10)',
-    border: 'rgba(37, 99, 235, 0.28)',
-    text: '#1d4ed8',
-    barClass: 'bg-blue-600',
-    dotClass: 'bg-blue-600',
+    code: 'LON · 01',
+    coords: '51.5072° N, 0.1276° W',
+    district: 'Bishopsgate, City of London',
+    photo:
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
+    bg: '#121211',
+    barClass: 'bg-[#121211]',
+    dotClass: 'bg-[#121211]',
+    badgeBg: 'bg-[#121211]/[0.06]',
+    badgeText: 'text-[#121211]',
   },
   'Office Sheffield': {
-    bg: '#0ea5e9',
-    lightBg: 'rgba(14, 165, 233, 0.10)',
-    border: 'rgba(14, 165, 233, 0.28)',
-    text: '#0284c7',
-    barClass: 'bg-sky-500',
-    dotClass: 'bg-sky-500',
+    code: 'SHF · 02',
+    coords: '53.3811° N, 1.4701° W',
+    district: 'Heart of the City, South Yorkshire',
+    photo:
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=900&q=80',
+    bg: '#D9381E',
+    barClass: 'bg-[#D9381E]',
+    dotClass: 'bg-[#D9381E]',
+    badgeBg: 'bg-[#D9381E]/[0.08]',
+    badgeText: 'text-[#D9381E]',
   },
   'Office Leeds': {
-    bg: '#059669',
-    lightBg: 'rgba(5, 150, 105, 0.10)',
-    border: 'rgba(5, 150, 105, 0.28)',
-    text: '#047857',
-    barClass: 'bg-emerald-600',
-    dotClass: 'bg-emerald-600',
+    code: 'LDS · 03',
+    coords: '53.8008° N, 1.5491° W',
+    district: 'Wellington Place, West Yorkshire',
+    photo:
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&q=80',
+    bg: '#1B4332',
+    barClass: 'bg-[#1B4332]',
+    dotClass: 'bg-[#1B4332]',
+    badgeBg: 'bg-[#1B4332]/[0.08]',
+    badgeText: 'text-[#1B4332]',
   },
   'Office Bristol': {
-    bg: '#d97706',
-    lightBg: 'rgba(217, 119, 6, 0.10)',
-    border: 'rgba(217, 119, 6, 0.28)',
-    text: '#b45309',
-    barClass: 'bg-amber-600',
-    dotClass: 'bg-amber-600',
+    code: 'BRS · 04',
+    coords: '51.4545° N, 2.5879° W',
+    district: 'Temple Quarter, Bristol',
+    photo:
+      'https://images.unsplash.com/photo-1464938050520-ef2270bb8ce8?auto=format&fit=crop&w=900&q=80',
+    bg: '#B45309',
+    barClass: 'bg-[#B45309]',
+    dotClass: 'bg-[#B45309]',
+    badgeBg: 'bg-[#B45309]/[0.09]',
+    badgeText: 'text-[#B45309]',
   },
 };
 
@@ -134,7 +150,6 @@ export default function DashboardView({
     let actualReadingCount = 0;
     let pdfAttachedCount = 0;
 
-    // 12-month structure (01..12)
     const monthsMatrix = {};
     MONTH_LABELS.forEach((m) => {
       monthsMatrix[m.num] = {
@@ -163,7 +178,6 @@ export default function DashboardView({
       });
     });
 
-    // Site breakdown table structure
     const siteMap = {};
     SITES.forEach((s) => {
       siteMap[s] = {
@@ -186,7 +200,6 @@ export default function DashboardView({
       };
     });
 
-    // Supplier breakdown table structure
     const supplierMap = {};
     SUPPLIERS.forEach((sup) => {
       supplierMap[sup] = {
@@ -221,7 +234,6 @@ export default function DashboardView({
       if (isActual) actualReadingCount++;
       if (inv.pdfAttachment?.dataUrl) pdfAttachedCount++;
 
-      // Determine normalized usage for the selected stream
       const normalizedUsage =
         inv.category === 'water' ? m.normalizedWaterM3 : m.normalizedEnergyKwh;
 
@@ -243,7 +255,6 @@ export default function DashboardView({
       const monthSlice = (inv.billingPeriodStart || '2026-01').slice(5, 7);
       const monthKey = monthsMatrix[monthSlice] ? monthSlice : '01';
 
-      // Populate Month × Site Matrix
       const mBucket = monthsMatrix[monthKey];
       mBucket.totalUsage += normalizedUsage;
       mBucket.totalCo2e += m.co2eTonnes;
@@ -264,7 +275,6 @@ export default function DashboardView({
       mBucket.byUtility[catKey].gross += gross;
       mBucket.byUtility[catKey].net += net;
 
-      // Populate Site Summary
       const sBucket = siteMap[site];
       sBucket.invoiceCount += 1;
       if (isActual) sBucket.actualCount += 1;
@@ -288,7 +298,6 @@ export default function DashboardView({
         sBucket.waterTonnes += m.co2eTonnes;
       }
 
-      // Populate Supplier Summary
       const supBucket = supplierMap[sup];
       supBucket.invoiceCount += 1;
       supBucket.netCost += net;
@@ -395,79 +404,270 @@ export default function DashboardView({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Top Page Title & Interactive Filter Command Bar */}
-      <div className="card-surface rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-blue-600 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
-              <span>Live Multi-Site Telemetry & ESG Ledger</span>
+    <div className="space-y-16 animate-fade-in">
+      {/* =====================================================================
+          00 / ANTI-GRAVITY ASYMMETRIC 16:9 EDITORIAL HERO SHOWCASE
+      ===================================================================== */}
+      <section className="relative pt-4 pb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+          {/* Left Asymmetric Editorial Column (7 Cols) */}
+          <div className="lg:col-span-7 space-y-7">
+            <div className="inline-flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-white border border-[#121211]/[0.08] shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-[#D9381E]" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#575550]">
+                Monograph Nº 04 · UK Commercial Utility & Carbon Architecture
+              </span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-gradient-heading mt-1.5">
-              <RevealText text="UK Business Energy & Site Performance Summaries" />
+
+            <h1 className="font-editorial text-5xl sm:text-6xl lg:text-[68px] font-normal text-[#121211] leading-[0.98] tracking-[-0.025em]">
+              <span className="italic text-[#575550]">Weightless</span> clarity
+              for enterprise energy &amp; carbon accounting.
             </h1>
+
+            <p className="text-sm sm:text-base text-[#575550] max-w-2xl leading-relaxed font-normal">
+              An editorial-grade environmental ledger engineered for UK
+              multi-site operations. Harmonizing verified supplier invoices from{' '}
+              <strong className="text-[#121211] font-medium">
+                EDF, SSE, EON, and Octopus
+              </strong>{' '}
+              into real-time DEFRA Scope 1 &amp; Scope 2 intelligence across
+              London, Sheffield, Leeds, and Bristol.
+            </p>
+
+            {/* Floating Action & Status Row */}
+            <div className="flex flex-wrap items-center gap-3.5 pt-1">
+              {isOwnerUnlocked ? (
+                <button
+                  type="button"
+                  onClick={onOpenNewInvoice}
+                  className="inline-flex items-center gap-2.5 bg-[#121211] hover:bg-[#D9381E] text-[#F6F5F0] text-xs font-medium px-6 py-3.5 rounded-full transition-all duration-300 ag-float-deep"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Log Utility Invoice</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onRequestOwnerUnlock}
+                  className="inline-flex items-center gap-2.5 bg-[#121211] hover:bg-[#D9381E] text-[#F6F5F0] text-xs font-medium px-6 py-3.5 rounded-full transition-all duration-300 ag-float-deep"
+                  title="Data input and edits are restricted to the repository owner (Mhutt97)"
+                >
+                  <Lock className="w-3.5 h-3.5 text-[#D9381E]" />
+                  <span>Read-Only · Owner Unlock (Mhutt97)</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => onSwitchTab('invoices')}
+                className="inline-flex items-center gap-2 bg-white hover:bg-[#EFECE6] text-[#121211] border border-[#121211]/12 text-xs font-medium px-5 py-3.5 rounded-full transition-all duration-300 shadow-xs"
+              >
+                <span>Inspect Audit Ledger ({invoices.length})</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#D9381E]" />
+              </button>
+
+              <button
+                type="button"
+                disabled
+                className="inline-flex items-center gap-2 bg-[#EFECE6]/70 border border-[#121211]/[0.07] text-[#8C8982] text-xs font-medium px-4 py-3 rounded-full cursor-not-allowed select-none"
+                title="Legacy Excel (.xlsx) workbook ingestion is locked during the testing phase"
+              >
+                <Lock className="w-3 h-3" />
+                <span>Excel (.xlsx) Ingestion</span>
+                <span className="text-[9px] uppercase tracking-widest px-2 py-0.5 bg-[#121211]/[0.06] text-[#575550] rounded-full">
+                  Testing
+                </span>
+              </button>
+            </div>
+
+            {/* Asymmetric Floating Hero Micro-Metrics Strip */}
+            <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-[#121211]/10">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
+                  Net Carbon
+                </div>
+                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                  <AnimatedNumber
+                    value={analytics.totalGhgTonnes}
+                    decimals={2}
+                  />
+                  <span className="font-sans-clean text-xs text-[#8C8982] ml-1">
+                    tCO₂e
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
+                  Total Energy
+                </div>
+                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                  <AnimatedNumber
+                    value={analytics.totalEnergyMwh}
+                    decimals={2}
+                  />
+                  <span className="font-sans-clean text-xs text-[#8C8982] ml-1">
+                    MWh
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
+                  Gross Spend
+                </div>
+                <div className="font-editorial text-3xl text-[#121211] mt-0.5">
+                  <AnimatedNumber
+                    value={analytics.totalGross}
+                    decimals={0}
+                    prefix="£"
+                  />
+                  <span className="font-sans-clean text-xs text-[#8C8982] ml-1">
+                    GBP
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8C8982]">
+                  Meter Fidelity
+                </div>
+                <div className="font-editorial text-3xl text-[#1B4332] mt-0.5">
+                  {filteredInvoices.length > 0
+                    ? Math.round(
+                        (analytics.actualReadingCount /
+                          filteredInvoices.length) *
+                          100
+                      )
+                    : 100}
+                  %
+                  <span className="font-sans-clean text-xs text-[#8C8982] ml-1">
+                    Actual
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              disabled
-              className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200/90 text-slate-400 text-xs font-semibold px-3.5 py-2 rounded-xl cursor-not-allowed select-none"
-              title="Legacy Excel (.xlsx) workbook ingestion is locked during the testing phase"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Upload Excel (.xlsx)</span>
-              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md">
-                Testing
-              </span>
-            </button>
+          {/* Right Asymmetric Multi-Depth Floating Composition (5 Cols) */}
+          <div className="lg:col-span-5 relative py-4">
+            {/* Primary Architectural Editorial Photograph Card (Depth Z-1) */}
+            <div className="relative mx-auto max-w-md lg:max-w-none rounded-[28px] overflow-hidden ag-card-static p-3 bg-white">
+              <div className="relative aspect-[4/4.6] rounded-[20px] overflow-hidden bg-[#EFECE6] group">
+                <img
+                  src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85"
+                  alt="UK Commercial Architecture — Bishopsgate London"
+                  className="w-full h-full object-cover editorial-photo"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#121211]/70 via-[#121211]/10 to-transparent" />
 
-            {isOwnerUnlocked ? (
-              <button
-                type="button"
-                onClick={onOpenNewInvoice}
-                className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #2563eb 0%, #0284c7 100%)',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.32)',
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                Log Utility Invoice
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onRequestOwnerUnlock}
-                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition-all"
-                title="Data input and edits are restricted to the repository owner (Mhutt97)"
-              >
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Read-Only · Owner Unlock</span>
-              </button>
-            )}
+                {/* Editorial Caption inside Frame */}
+                <div className="absolute bottom-5 left-5 right-5 text-white flex items-end justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-white/70">
+                      Plate I · Architectural Dossier
+                    </div>
+                    <div className="font-editorial text-2xl leading-tight mt-0.5">
+                      United Kingdom Commercial Portfolio
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 shrink-0">
+                    4 Active Sites
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating Depth-of-Field Layer 2 (Top-Right Weightless Pill) */}
+            <div className="hidden sm:flex items-center gap-2.5 absolute -top-2 -right-3 z-20 ag-glass px-4 py-2.5 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-[#1B4332]" />
+              <span className="text-[11px] font-medium text-[#121211]">
+                DEFRA 2026 · GBP (£) · 20% / 5% / 0% VAT
+              </span>
+            </div>
+
+            {/* Floating Depth-of-Field Layer 3 (Bottom-Left Overhanging Glass Telemetry Card) */}
+            <div className="sm:absolute -bottom-6 sm:-left-8 z-20 mt-4 sm:mt-0 sm:w-80 ag-glass rounded-3xl p-5">
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-[#575550]">
+                <span>Live Telemetry Layer</span>
+                <span className="text-[#D9381E] font-semibold">
+                  {selectedSite === 'All Sites' ? '4 UK Sites' : selectedSite}
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <div className="font-editorial text-3xl text-[#121211]">
+                  {analytics.totalGhgTonnes.toFixed(2)}{' '}
+                  <span className="font-sans-clean text-xs text-[#575550]">
+                    tCO₂e
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-[#1B4332]">
+                  £
+                  {analytics.totalNet.toLocaleString('en-GB', {
+                    maximumFractionDigits: 0,
+                  })}{' '}
+                  Net
+                </span>
+              </div>
+              {/* Minimalist Scope Proportion Bar */}
+              <div className="mt-3 h-1.5 w-full rounded-full bg-[#121211]/10 overflow-hidden flex">
+                <div
+                  className="bg-[#121211] h-full transition-all duration-500"
+                  style={{
+                    width: `${
+                      analytics.totalGhgTonnes > 0
+                        ? (analytics.scope2Tonnes / analytics.totalGhgTonnes) *
+                          100
+                        : 65
+                    }%`,
+                  }}
+                />
+                <div
+                  className="bg-[#D9381E] h-full transition-all duration-500"
+                  style={{
+                    width: `${
+                      analytics.totalGhgTonnes > 0
+                        ? (analytics.scope1Tonnes / analytics.totalGhgTonnes) *
+                          100
+                        : 30
+                    }%`,
+                  }}
+                />
+                <div
+                  className="bg-[#1B4332] h-full flex-1 transition-all duration-500"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[10px] text-[#575550]">
+                <span>Scope 2: {analytics.scope2Tonnes.toFixed(2)}t</span>
+                <span>Scope 1: {analytics.scope1Tonnes.toFixed(2)}t</span>
+                <span>Water: {analytics.waterTonnes.toFixed(2)}t</span>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Interactive Filter Controls */}
-        <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
+      {/* =====================================================================
+          01 / WEIGHTLESS FLOATING FILTER & METRIC COMMAND BAR
+      ===================================================================== */}
+      <section className="ag-glass rounded-[28px] p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 mr-1">
-              <Filter className="w-3.5 h-3.5 text-blue-600" />
-              <span>Filter Ledger:</span>
+            <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#575550] mr-2">
+              <Filter className="w-3.5 h-3.5 text-[#D9381E]" />
+              <span>01 / Telemetry Lens</span>
             </div>
 
             {/* Site Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs font-semibold text-slate-500">
-                Site:
+            <div className="flex items-center gap-2 bg-white border border-[#121211]/10 rounded-full px-3.5 py-1.5 shadow-2xs">
+              <Building2 className="w-3.5 h-3.5 text-[#8C8982]" />
+              <span className="text-[11px] uppercase tracking-wider text-[#8C8982]">
+                Site
               </span>
               <select
                 value={selectedSite}
                 onChange={(e) => onSelectSite(e.target.value)}
-                className="text-xs font-bold bg-transparent text-slate-900 focus:outline-none"
+                className="text-xs font-medium bg-transparent text-[#121211] focus:outline-none cursor-pointer"
               >
                 {siteOptions.map((s) => (
                   <option key={s} value={s}>
@@ -478,14 +678,14 @@ export default function DashboardView({
             </div>
 
             {/* Utility Stream Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <span className="text-xs font-semibold text-slate-500">
-                Utility:
+            <div className="flex items-center gap-2 bg-white border border-[#121211]/10 rounded-full px-3.5 py-1.5 shadow-2xs">
+              <span className="text-[11px] uppercase tracking-wider text-[#8C8982]">
+                Stream
               </span>
               <select
                 value={selectedUtility}
                 onChange={(e) => setSelectedUtility(e.target.value)}
-                className="text-xs font-bold bg-transparent text-slate-900 focus:outline-none"
+                className="text-xs font-medium bg-transparent text-[#121211] focus:outline-none cursor-pointer"
               >
                 <option value="all">All Utilities</option>
                 <option value="electricity">Electricity (Scope 2)</option>
@@ -495,14 +695,14 @@ export default function DashboardView({
             </div>
 
             {/* Supplier Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <span className="text-xs font-semibold text-slate-500">
-                Supplier:
+            <div className="flex items-center gap-2 bg-white border border-[#121211]/10 rounded-full px-3.5 py-1.5 shadow-2xs">
+              <span className="text-[11px] uppercase tracking-wider text-[#8C8982]">
+                Supplier
               </span>
               <select
                 value={selectedSupplier}
                 onChange={(e) => setSelectedSupplier(e.target.value)}
-                className="text-xs font-bold bg-transparent text-slate-900 focus:outline-none"
+                className="text-xs font-medium bg-transparent text-[#121211] focus:outline-none cursor-pointer"
               >
                 <option value="all">All Suppliers</option>
                 {SUPPLIERS.map((sup) => (
@@ -514,14 +714,14 @@ export default function DashboardView({
             </div>
 
             {/* Reporting Year Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <span className="text-xs font-semibold text-slate-500">
-                Year:
+            <div className="flex items-center gap-2 bg-white border border-[#121211]/10 rounded-full px-3.5 py-1.5 shadow-2xs">
+              <span className="text-[11px] uppercase tracking-wider text-[#8C8982]">
+                Period
               </span>
               <select
                 value={selectedYear}
                 onChange={(e) => onSelectYear(e.target.value)}
-                className="text-xs font-bold bg-transparent text-slate-900 focus:outline-none"
+                className="text-xs font-medium bg-transparent text-[#121211] focus:outline-none cursor-pointer"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -533,7 +733,7 @@ export default function DashboardView({
           </div>
 
           {/* Active Metric Switcher for Graphs & Matrix */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+          <div className="flex items-center gap-1 bg-[#EFECE6] p-1 rounded-full border border-[#121211]/[0.06]">
             {[
               { id: 'usage', label: 'Usage (kWh/m³)' },
               { id: 'co2e', label: 'Emissions (tCO₂e)' },
@@ -544,10 +744,10 @@ export default function DashboardView({
                 key={m.id}
                 type="button"
                 onClick={() => setActiveMetric(m.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
                   activeMetric === m.id
-                    ? 'bg-white text-blue-600 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-[#121211] text-[#F6F5F0] shadow-xs'
+                    : 'text-[#575550] hover:text-[#121211]'
                 }`}
               >
                 {m.label}
@@ -555,755 +755,986 @@ export default function DashboardView({
             ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Executive KPI Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Card 1: Total GHG Footprint */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Carbon Footprint
+      {/* =====================================================================
+          02 / ASYMMETRIC FLOATING BENTO KPI ARCHITECTURE
+      ===================================================================== */}
+      <section className="space-y-5">
+        <div className="flex items-baseline justify-between border-b border-[#121211]/10 pb-3">
+          <div className="flex items-baseline gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
+              02 / Portfolio Telemetry
             </span>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
-              UK DEFRA
-            </span>
+            <h2 className="font-editorial text-3xl text-[#121211]">
+              <RevealText text="Consolidated Environmental & Financial Ledger" />
+            </h2>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.totalGhgTonnes}
-              decimals={2}
-              className="text-3xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-500">tCO₂e</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Combined Scope 1, Scope 2 & Water</span>
-            <span className="font-bold text-slate-700">
-              {filteredInvoices.length} invoices
-            </span>
-          </div>
+          <span className="text-xs text-[#8C8982] hidden sm:inline">
+            Showing {filteredInvoices.length} verified records · UK DEFRA
+          </span>
         </div>
 
-        {/* Card 2: Electricity Usage & Scope 2 */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Electricity Usage (Scope 2)
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.electricityKwh}
-              decimals={0}
-              className="text-3xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-500">kWh</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>{(analytics.electricityKwh / 1000).toFixed(2)} MWh</span>
-            <span className="font-bold text-blue-700">
-              {analytics.scope2Tonnes.toFixed(3)} tCO₂e
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Natural Gas & Fuels (Scope 1) */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Natural Gas & Fuels (Scope 1)
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.fuelKwhEq}
-              decimals={0}
-              className="text-3xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-500">kWh-eq</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>{(analytics.fuelKwhEq / 1000).toFixed(2)} MWh</span>
-            <span className="font-bold text-amber-700">
-              {analytics.scope1Tonnes.toFixed(3)} tCO₂e
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: Total Combined Energy (MWh) */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Energy Consumption
-            </span>
-            <span className="text-[11px] font-bold text-slate-400">
-              Electricity + Gas
-            </span>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.totalEnergyMwh}
-              decimals={2}
-              className="text-2xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-500">MWh</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Normalized kWh Total:</span>
-            <span className="font-bold text-slate-700">
-              {analytics.totalEnergyKwh.toLocaleString('en-GB', {
-                maximumFractionDigits: 0,
-              })}{' '}
-              kWh
-            </span>
-          </div>
-        </div>
-
-        {/* Card 5: Water & Wastewater */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Water & Wastewater
-            </span>
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.waterM3}
-              decimals={1}
-              className="text-2xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-500">m³</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Embodied Water GHG:</span>
-            <span className="font-bold text-cyan-700">
-              {analytics.waterTonnes.toFixed(3)} tCO₂e
-            </span>
-          </div>
-        </div>
-
-        {/* Card 6: Financial Expenditure (£ GBP) */}
-        <div className="card-surface rounded-2xl p-5 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Total Invoice Spend (£ GBP)
-            </span>
-            {filteredInvoices.length > 0 &&
-            analytics.actualReadingCount === filteredInvoices.length ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                <CheckCircle2 className="w-3 h-3" />
-                100% Actual
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Card 1: Total GHG Footprint */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                01 · Total Carbon Footprint
               </span>
-            ) : (
-              <span className="text-[11px] font-bold text-slate-500">
-                {analytics.actualReadingCount}/{filteredInvoices.length} Actual
+              <span className="text-[10px] font-semibold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#121211] text-[#F6F5F0]">
+                DEFRA 2026
               </span>
-            )}
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <AnimatedNumber
-              value={analytics.totalGross}
-              decimals={2}
-              prefix="£"
-              className="text-2xl font-extrabold tracking-tight text-slate-900"
-            />
-            <span className="text-xs font-bold text-slate-400">Gross</span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>
-              Net:{' '}
-              <strong className="text-slate-700">
-                £
-                {analytics.totalNet.toLocaleString('en-GB', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
-            </span>
-            <span>
-              VAT:{' '}
-              <strong className="text-slate-700">
-                £
-                {analytics.totalVat.toLocaleString('en-GB', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </strong>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* LIVE GRAPHS ROW: Monthly Multi-Site Graph + Site Share Distribution Graph */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live Graph 1: Monthly Performance by Site / Utility */}
-        <div className="lg:col-span-2 card-surface rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600">
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  <span>Active Live Graph · Monthly Breakdown</span>
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
-                  {metricMeta.label} per Month (
-                  {chartBreakdownMode === 'site'
-                    ? 'Stacked by Site Name'
-                    : 'Stacked by Utility Stream'}
-                  )
-                </h3>
-              </div>
-
-              {/* Breakdown Mode Switcher */}
-              <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setChartBreakdownMode('site')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    chartBreakdownMode === 'site'
-                      ? 'bg-white text-blue-600 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  By Site Name
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChartBreakdownMode('utility')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    chartBreakdownMode === 'utility'
-                      ? 'bg-white text-blue-600 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  By Utility
-                </button>
-              </div>
             </div>
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.totalGhgTonnes}
+                decimals={2}
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">tCO₂e</span>
+            </div>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>Scope 1, Scope 2 &amp; Water</span>
+              <span className="font-medium text-[#121211]">
+                {filteredInvoices.length} invoices
+              </span>
+            </div>
+          </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 mb-2 text-xs font-semibold text-slate-600">
-              {chartBreakdownMode === 'site' ? (
-                <div className="flex flex-wrap items-center gap-4">
-                  {SITES.map((s) => (
-                    <span key={s} className="inline-flex items-center gap-1.5">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-full ${SITE_COLORS[s].dotClass}`}
-                      />
-                      <span>{s}</span>
-                    </span>
-                  ))}
-                </div>
+          {/* Card 2: Electricity Usage & Scope 2 */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between lg:translate-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                02 · Grid Electricity (Scope 2)
+              </span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#121211]" />
+            </div>
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.electricityKwh}
+                decimals={0}
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">kWh</span>
+            </div>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>{(analytics.electricityKwh / 1000).toFixed(2)} MWh</span>
+              <span className="font-medium text-[#121211]">
+                {analytics.scope2Tonnes.toFixed(3)} tCO₂e
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Natural Gas & Fuels (Scope 1) */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                03 · Natural Gas (Scope 1)
+              </span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#D9381E]" />
+            </div>
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.fuelKwhEq}
+                decimals={0}
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">kWh-eq</span>
+            </div>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>{(analytics.fuelKwhEq / 1000).toFixed(2)} MWh</span>
+              <span className="font-medium text-[#D9381E]">
+                {analytics.scope1Tonnes.toFixed(3)} tCO₂e
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Total Combined Energy (MWh) */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                04 · Combined Energy
+              </span>
+              <span className="text-[11px] text-[#8C8982]">
+                Electricity + Gas
+              </span>
+            </div>
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.totalEnergyMwh}
+                decimals={2}
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">MWh</span>
+            </div>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>Normalized Total:</span>
+              <span className="font-medium text-[#121211]">
+                {analytics.totalEnergyKwh.toLocaleString('en-GB', {
+                  maximumFractionDigits: 0,
+                })}{' '}
+                kWh
+              </span>
+            </div>
+          </div>
+
+          {/* Card 5: Water & Wastewater */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between lg:translate-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                05 · Water Supply &amp; Treatment
+              </span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#1B4332]" />
+            </div>
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.waterM3}
+                decimals={1}
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">m³</span>
+            </div>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>Embodied Water GHG:</span>
+              <span className="font-medium text-[#1B4332]">
+                {analytics.waterTonnes.toFixed(3)} tCO₂e
+              </span>
+            </div>
+          </div>
+
+          {/* Card 6: Financial Expenditure (£ GBP) */}
+          <div className="ag-card rounded-[26px] p-7 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8C8982]">
+                06 · Settlement (£ GBP)
+              </span>
+              {filteredInvoices.length > 0 &&
+              analytics.actualReadingCount === filteredInvoices.length ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#1B4332] bg-[#1B4332]/10 px-2.5 py-0.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  100% Actual
+                </span>
               ) : (
-                <div className="flex flex-wrap items-center gap-4">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                    Electricity (Scope 2)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    Natural Gas (Scope 1)
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-                    Water
-                  </span>
-                </div>
-              )}
-
-              {hoveredMonthIdx !== null && (
-                <span className="text-xs font-bold text-blue-600">
-                  {analytics.monthsArray[hoveredMonthIdx].full}:{' '}
-                  {formatMetricNumber(
-                    metricMeta.getVal(analytics.monthsArray[hoveredMonthIdx])
-                  )}{' '}
-                  {metricMeta.prefix ? '' : metricMeta.unit}
+                <span className="text-[11px] text-[#8C8982]">
+                  {analytics.actualReadingCount}/{filteredInvoices.length} Actual
                 </span>
               )}
             </div>
-
-            {/* 12-Month Interactive Bar Chart */}
-            <div className="h-64 pt-6 pb-2 px-1 flex items-end gap-2 sm:gap-3 border-b border-slate-200 relative">
-              {analytics.monthsArray.map((mItem, idx) => {
-                const monthTotal = metricMeta.getVal(mItem);
-                const segments =
-                  chartBreakdownMode === 'site'
-                    ? SITES.map((s) => ({
-                        key: s,
-                        label: s,
-                        val: metricMeta.getVal(mItem.bySite[s]),
-                        barClass: SITE_COLORS[s].barClass,
-                      }))
-                    : [
-                        {
-                          key: 'electricity',
-                          label: 'Electricity',
-                          val: metricMeta.getVal(mItem.byUtility.electricity),
-                          barClass: 'bg-blue-600',
-                        },
-                        {
-                          key: 'natural_gas',
-                          label: 'Natural Gas',
-                          val: metricMeta.getVal(mItem.byUtility.natural_gas),
-                          barClass: 'bg-amber-500',
-                        },
-                        {
-                          key: 'water',
-                          label: 'Water',
-                          val: metricMeta.getVal(mItem.byUtility.water),
-                          barClass: 'bg-cyan-500',
-                        },
-                      ];
-
-                return (
-                  <div
-                    key={mItem.monthNum}
-                    onMouseEnter={() => setHoveredMonthIdx(idx)}
-                    onMouseLeave={() => setHoveredMonthIdx(null)}
-                    className="flex-1 flex flex-col items-center h-full justify-end group cursor-pointer"
-                  >
-                    <div className="text-[10px] font-bold text-slate-500 mb-1.5 group-hover:text-blue-600 transition-colors">
-                      {monthTotal > 0
-                        ? formatMetricNumber(
-                            monthTotal,
-                            activeMetric === 'usage' ? 0 : 1
-                          )
-                        : '—'}
-                    </div>
-                    <div className="w-full max-w-[44px] flex flex-col-reverse rounded-t-lg overflow-hidden bg-slate-100/90 h-44 justify-start border border-slate-200/50 group-hover:border-blue-300 transition-all">
-                      {segments.map((seg) => {
-                        if (seg.val <= 0) return null;
-                        const pct = (seg.val / maxMonthlyBarValue) * 100;
-                        return (
-                          <div
-                            key={seg.key}
-                            style={{ height: `${Math.max(3, pct)}%` }}
-                            className={`${seg.barClass} transition-all duration-500`}
-                            title={`${mItem.full} · ${
-                              seg.label
-                            }: ${formatMetricNumber(seg.val)} ${
-                              metricMeta.prefix ? '' : metricMeta.unit
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <span className="mt-2 text-xs font-bold text-slate-600 group-hover:text-blue-600">
-                      {mItem.short}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="my-5 flex items-baseline gap-2.5">
+              <AnimatedNumber
+                value={analytics.totalGross}
+                decimals={2}
+                prefix="£"
+                className="font-editorial text-5xl text-[#121211]"
+              />
+              <span className="text-xs font-medium text-[#8C8982]">Gross</span>
             </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-            <span>
-              Hover any month column above to inspect site-level figures, or
-              switch metrics in the top bar.
-            </span>
-            <button
-              type="button"
-              onClick={() => onSwitchTab && onSwitchTab('invoices')}
-              className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700"
-            >
-              <span>Manage Underlying Invoices</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="pt-4 border-t border-[#121211]/[0.07] flex items-center justify-between text-xs text-[#575550]">
+              <span>
+                Net:{' '}
+                <strong className="text-[#121211]">
+                  £
+                  {analytics.totalNet.toLocaleString('en-GB', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </strong>
+              </span>
+              <span>
+                VAT:{' '}
+                <strong className="text-[#121211]">
+                  £
+                  {analytics.totalVat.toLocaleString('en-GB', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </strong>
+              </span>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Live Graph 2: Site Comparison & Share Distribution */}
-        <div className="card-surface rounded-2xl p-6 flex flex-col justify-between">
-          <div>
-            <div className="pb-4 border-b border-slate-100">
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600">
-                <Layers className="w-3.5 h-3.5" />
-                <span>Site Distribution</span>
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
-                {metricMeta.label} by Site
-              </h3>
-            </div>
+      {/* =====================================================================
+          03 / EDITORIAL SITE ARCHITECTURE LOOKBOOK (CRISP PHOTOGRAPHY + LIVE DATA)
+      ===================================================================== */}
+      <section className="space-y-6 pt-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-[#121211]/10 pb-3">
+          <div className="flex items-baseline gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
+              03 / Site Architecture
+            </span>
+            <h2 className="font-editorial text-3xl text-[#121211]">
+              Regional Facility Dossiers
+            </h2>
+          </div>
+          <p className="text-xs text-[#8C8982]">
+            Select any architectural card to isolate its telemetry across all
+            graphs and matrices
+          </p>
+        </div>
 
-            <div className="mt-4 space-y-4">
-              {analytics.siteSeries.map((site) => {
-                const siteVal = metricMeta.getVal(site);
-                const sharePct =
-                  companyMetricTotal > 0
-                    ? (siteVal / companyMetricTotal) * 100
-                    : 0;
-                const activeMonthsCount = site.activeMonths.size || 1;
-                const monthlyAvg =
-                  site.invoiceCount > 0 ? siteVal / activeMonthsCount : 0;
-                const palette = SITE_COLORS[site.siteName] || SITE_COLORS[SITES[0]];
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {analytics.siteSeries.map((s, idx) => {
+            const meta =
+              SITE_EDITORIAL_META[s.siteName] ||
+              SITE_EDITORIAL_META['Head Office London'];
+            const isSelected = selectedSite === s.siteName;
+            return (
+              <div
+                key={s.siteName}
+                onClick={() =>
+                  onSelectSite(isSelected ? 'All Sites' : s.siteName)
+                }
+                className={`group cursor-pointer rounded-[26px] p-3.5 transition-all duration-500 ${
+                  idx % 2 === 1 ? 'lg:translate-y-4' : ''
+                } ${
+                  isSelected
+                    ? 'bg-[#121211] text-[#F6F5F0] ag-float-deep'
+                    : 'ag-card text-[#121211]'
+                }`}
+              >
+                {/* Crisp Architectural Photography Placeholder */}
+                <div className="relative aspect-[16/10] rounded-[18px] overflow-hidden bg-[#EFECE6] mb-4">
+                  <img
+                    src={meta.photo}
+                    alt={s.siteName}
+                    className="w-full h-full object-cover editorial-photo"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#121211] text-[10px] font-semibold uppercase tracking-widest">
+                    {meta.code}
+                  </div>
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[10px] text-white/90 font-medium">
+                    <span>{meta.coords}</span>
+                    <span>{s.invoiceCount} invoices</span>
+                  </div>
+                </div>
 
-                return (
+                <div className="px-2 pb-2 space-y-3">
+                  <div>
+                    <div
+                      className={`text-[10px] uppercase tracking-[0.14em] ${
+                        isSelected ? 'text-white/60' : 'text-[#8C8982]'
+                      }`}
+                    >
+                      {meta.district}
+                    </div>
+                    <h3 className="font-editorial text-2xl leading-tight mt-0.5">
+                      {s.siteName}
+                    </h3>
+                  </div>
+
                   <div
-                    key={site.siteName}
-                    onClick={() =>
-                      onSelectSite(
-                        selectedSite === site.siteName
-                          ? 'All Sites'
-                          : site.siteName
-                      )
-                    }
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                      selectedSite === site.siteName
-                        ? 'border-blue-500 bg-blue-50/40 shadow-2xs'
-                        : 'border-slate-200/80 hover:border-blue-300 bg-slate-50/50'
+                    className={`pt-3 border-t grid grid-cols-2 gap-2 text-xs ${
+                      isSelected
+                        ? 'border-white/15'
+                        : 'border-[#121211]/[0.07]'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-extrabold text-slate-900 flex items-center gap-2">
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full ${palette.dotClass}`}
-                        />
-                        {site.siteName}
-                      </span>
-                      <span className="font-extrabold text-slate-900">
-                        {formatMetricNumber(siteVal)}{' '}
-                        {metricMeta.prefix ? '' : metricMeta.unit}
-                      </span>
-                    </div>
-
-                    <div className="mt-1.5 flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                      <span>
-                        Avg/mo: {formatMetricNumber(monthlyAvg)}{' '}
-                        {metricMeta.prefix ? '' : metricMeta.unit}
-                      </span>
-                      <span>
-                        {sharePct.toFixed(1)}% share · {site.invoiceCount}{' '}
-                        {site.invoiceCount === 1 ? 'bill' : 'bills'}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
+                    <div>
                       <div
-                        className={`h-full ${palette.barClass} rounded-full transition-all duration-500`}
-                        style={{ width: `${Math.min(100, sharePct)}%` }}
-                      />
+                        className={`text-[10px] uppercase tracking-wider ${
+                          isSelected ? 'text-white/60' : 'text-[#8C8982]'
+                        }`}
+                      >
+                        Energy (kWh)
+                      </div>
+                      <div className="font-semibold mt-0.5">
+                        {s.totalEnergyKwh.toLocaleString('en-GB', {
+                          maximumFractionDigits: 0,
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div
+                        className={`text-[10px] uppercase tracking-wider ${
+                          isSelected ? 'text-white/60' : 'text-[#8C8982]'
+                        }`}
+                      >
+                        Gross (£)
+                      </div>
+                      <div className="font-semibold mt-0.5">
+                        £
+                        {s.grossCost.toLocaleString('en-GB', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* =====================================================================
+          04 / ACTIVE LIVE GRAPHS: TEMPORAL VARIANCE & SITE SHARE
+      ===================================================================== */}
+      <section className="space-y-6 pt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-[#121211]/10 pb-3">
+          <div className="flex items-baseline gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
+              04 / Temporal Variance
+            </span>
+            <h2 className="font-editorial text-3xl text-[#121211]">
+              Active Monthly &amp; Proportional Graphs
+            </h2>
+          </div>
+          <span className="text-xs text-[#8C8982]">
+            Active Metric: <strong className="text-[#121211]">{metricMeta.label}</strong>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
+          {/* Live Graph 1: Monthly Performance by Site / Utility */}
+          <div className="lg:col-span-2 ag-card rounded-[28px] p-7 flex flex-col justify-between">
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-[#121211]/[0.07]">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D9381E]">
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>Live Interactive Graph · 12-Month Horizon</span>
+                  </div>
+                  <h3 className="font-editorial text-2xl text-[#121211] mt-1">
+                    {metricMeta.label} per Month (
+                    {chartBreakdownMode === 'site'
+                      ? 'Stacked by Site Name'
+                      : 'Stacked by Utility Stream'}
+                    )
+                  </h3>
+                </div>
+
+                {/* Breakdown Mode Switcher */}
+                <div className="inline-flex items-center bg-[#EFECE6] p-1 rounded-full border border-[#121211]/[0.06] text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setChartBreakdownMode('site')}
+                    className={`px-3.5 py-1 rounded-full transition-all ${
+                      chartBreakdownMode === 'site'
+                        ? 'bg-[#121211] text-[#F6F5F0] shadow-2xs'
+                        : 'text-[#575550] hover:text-[#121211]'
+                    }`}
+                  >
+                    By Site Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChartBreakdownMode('utility')}
+                    className={`px-3.5 py-1 rounded-full transition-all ${
+                      chartBreakdownMode === 'utility'
+                        ? 'bg-[#121211] text-[#F6F5F0] shadow-2xs'
+                        : 'text-[#575550] hover:text-[#121211]'
+                    }`}
+                  >
+                    By Utility
+                  </button>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="flex flex-wrap items-center justify-between gap-2 mt-4 mb-2 text-xs font-medium text-[#575550]">
+                {chartBreakdownMode === 'site' ? (
+                  <div className="flex flex-wrap items-center gap-5">
+                    {SITES.map((s) => (
+                      <span key={s} className="inline-flex items-center gap-2">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${SITE_EDITORIAL_META[s].dotClass}`}
+                        />
+                        <span>{s}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-5">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#121211]" />
+                      Electricity (Scope 2)
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#D9381E]" />
+                      Natural Gas (Scope 1)
+                    </span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#1B4332]" />
+                      Water
+                    </span>
+                  </div>
+                )}
+                <span className="text-[11px] text-[#8C8982]">
+                  Hover any month bar for site breakdown
+                </span>
+              </div>
+            </div>
+
+            {/* 12-Month Stacked Bar Chart Canvas */}
+            <div className="relative pt-8 pb-2">
+              <div className="h-64 flex items-end gap-2.5 sm:gap-3.5 border-b border-[#121211]/10 pb-3 px-1">
+                {analytics.monthsArray.map((m, idx) => {
+                  const monthTotal = metricMeta.getVal(m);
+                  const totalHeightPct =
+                    monthTotal > 0
+                      ? Math.max(6, (monthTotal / maxMonthlyBarValue) * 100)
+                      : 0;
+
+                  return (
+                    <div
+                      key={m.monthNum}
+                      onMouseEnter={() => setHoveredMonthIdx(idx)}
+                      onMouseLeave={() => setHoveredMonthIdx(null)}
+                      className="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer"
+                    >
+                      {/* Hover Tooltip */}
+                      {hoveredMonthIdx === idx && monthTotal > 0 && (
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full z-20 w-56 p-3.5 rounded-2xl bg-[#121211] text-[#F6F5F0] text-[11px] shadow-2xl pointer-events-none">
+                          <div className="font-semibold text-white border-b border-white/15 pb-1.5 mb-2 flex justify-between">
+                            <span>
+                              {m.full}{' '}
+                              {selectedYear !== 'All Years' ? selectedYear : ''}
+                            </span>
+                            <span className="text-[#D9381E]">
+                              {formatMetricNumber(monthTotal)}{' '}
+                              {metricMeta.prefix ? '' : metricMeta.unit}
+                            </span>
+                          </div>
+                          {chartBreakdownMode === 'site' ? (
+                            <div className="space-y-1">
+                              {SITES.map((s) => {
+                                const v = metricMeta.getVal(m.bySite[s]);
+                                if (v <= 0) return null;
+                                return (
+                                  <div
+                                    key={s}
+                                    className="flex items-center justify-between text-white/80"
+                                  >
+                                    <span className="truncate pr-2">{s}:</span>
+                                    <span className="font-semibold text-white">
+                                      {formatMetricNumber(v)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {[
+                                { id: 'electricity', name: 'Electricity' },
+                                { id: 'natural_gas', name: 'Natural Gas' },
+                                { id: 'water', name: 'Water' },
+                              ].map((u) => {
+                                const v = metricMeta.getVal(m.byUtility[u.id]);
+                                if (v <= 0) return null;
+                                return (
+                                  <div
+                                    key={u.id}
+                                    className="flex items-center justify-between text-white/80"
+                                  >
+                                    <span>{u.name}:</span>
+                                    <span className="font-semibold text-white">
+                                      {formatMetricNumber(v)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Value Label Above Bar */}
+                      <div className="text-[10px] font-medium text-[#8C8982] mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {monthTotal > 0 ? formatMetricNumber(monthTotal, 0) : ''}
+                      </div>
+
+                      {/* Stacked Bar Container */}
+                      <div
+                        className="w-full max-w-[34px] rounded-t-lg overflow-hidden flex flex-col-reverse bg-[#EFECE6] transition-all duration-500 group-hover:brightness-110"
+                        style={{
+                          height: `${totalHeightPct}%`,
+                          minHeight: monthTotal > 0 ? '6px' : '2px',
+                        }}
+                      >
+                        {monthTotal > 0 &&
+                          (chartBreakdownMode === 'site'
+                            ? SITES.map((s) => {
+                                const siteVal = metricMeta.getVal(m.bySite[s]);
+                                const segPct =
+                                  monthTotal > 0
+                                    ? (siteVal / monthTotal) * 100
+                                    : 0;
+                                if (segPct <= 0) return null;
+                                return (
+                                  <div
+                                    key={s}
+                                    style={{ height: `${segPct}%` }}
+                                    className={`w-full ${SITE_EDITORIAL_META[s].barClass} transition-all duration-500`}
+                                  />
+                                );
+                              })
+                            : [
+                                { id: 'electricity', cls: 'bg-[#121211]' },
+                                { id: 'natural_gas', cls: 'bg-[#D9381E]' },
+                                { id: 'water', cls: 'bg-[#1B4332]' },
+                              ].map((u) => {
+                                const uVal = metricMeta.getVal(
+                                  m.byUtility[u.id]
+                                );
+                                const segPct =
+                                  monthTotal > 0
+                                    ? (uVal / monthTotal) * 100
+                                    : 0;
+                                if (segPct <= 0) return null;
+                                return (
+                                  <div
+                                    key={u.id}
+                                    style={{ height: `${segPct}%` }}
+                                    className={`w-full ${u.cls} transition-all duration-500`}
+                                  />
+                                );
+                              }))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Month X-Axis Labels */}
+              <div className="flex items-center gap-2.5 sm:gap-3.5 pt-2.5 px-1">
+                {analytics.monthsArray.map((m) => (
+                  <div
+                    key={m.monthNum}
+                    className="flex-1 text-center text-[11px] font-medium text-[#575550]"
+                  >
+                    {m.short}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Click any site card to isolate its monthly profile</span>
+          {/* Live Graph 2: Site Comparison & Proportional Distribution */}
+          <div className="ag-card rounded-[28px] p-7 flex flex-col justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D9381E]">
+                <Layers className="w-3.5 h-3.5" />
+                <span>Proportional Share</span>
+              </div>
+              <h3 className="font-editorial text-2xl text-[#121211] mt-1">
+                {metricMeta.label} by Site
+              </h3>
+              <p className="text-xs text-[#8C8982] mt-1">
+                Click any site below to isolate its monthly profile
+              </p>
+
+              {/* Stacked Company Proportion Bar */}
+              <div className="mt-5 h-3 w-full rounded-full bg-[#EFECE6] overflow-hidden flex gap-0.5 p-0.5">
+                {analytics.siteSeries.map((s) => {
+                  const val = metricMeta.getVal(s);
+                  const pct =
+                    companyMetricTotal > 0
+                      ? (val / companyMetricTotal) * 100
+                      : 0;
+                  if (pct <= 0) return null;
+                  return (
+                    <div
+                      key={s.siteName}
+                      style={{ width: `${pct}%` }}
+                      className={`h-full first:rounded-l-full last:rounded-r-full ${
+                        SITE_EDITORIAL_META[s.siteName].barClass
+                      } transition-all duration-500`}
+                      title={`${s.siteName}: ${pct.toFixed(1)}%`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Site Cards List */}
+              <div className="mt-5 space-y-3">
+                {analytics.siteSeries.map((s) => {
+                  const val = metricMeta.getVal(s);
+                  const sharePct =
+                    companyMetricTotal > 0
+                      ? (val / companyMetricTotal) * 100
+                      : 0;
+                  const activeMonthsCount = Math.max(1, s.activeMonths.size);
+                  const monthlyAvg = val / activeMonthsCount;
+                  const isSelected = selectedSite === s.siteName;
+
+                  return (
+                    <button
+                      key={s.siteName}
+                      type="button"
+                      onClick={() =>
+                        onSelectSite(isSelected ? 'All Sites' : s.siteName)
+                      }
+                      className={`w-full text-left p-3.5 rounded-2xl border transition-all ${
+                        isSelected
+                          ? 'border-[#121211] bg-[#121211]/[0.04]'
+                          : 'border-[#121211]/[0.07] hover:border-[#121211]/25 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#121211] flex items-center gap-2">
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full ${
+                              SITE_EDITORIAL_META[s.siteName].dotClass
+                            }`}
+                          />
+                          {s.siteName}
+                        </span>
+                        <span className="font-semibold text-[#121211]">
+                          {formatMetricNumber(val)}{' '}
+                          {metricMeta.prefix ? '' : metricMeta.unit}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 w-full bg-[#EFECE6] h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            SITE_EDITORIAL_META[s.siteName].barClass
+                          } transition-all duration-500`}
+                          style={{ width: `${Math.min(100, sharePct)}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-[#8C8982]">
+                        <span>
+                          Avg/active mo:{' '}
+                          <strong className="text-[#121211]">
+                            {formatMetricNumber(monthlyAvg)}
+                          </strong>
+                        </span>
+                        <span className="font-medium text-[#575550]">
+                          {sharePct.toFixed(1)}% of total
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {selectedSite !== 'All Sites' && (
               <button
                 type="button"
                 onClick={() => onSelectSite('All Sites')}
-                className="font-bold text-blue-600 hover:underline"
+                className="mt-4 w-full py-2.5 rounded-full bg-[#EFECE6] hover:bg-[#121211] hover:text-white text-xs font-medium text-[#121211] transition-colors"
               >
-                Reset to All Sites
+                Reset Filter · Show All 4 UK Sites
               </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* LIVE SUMMARY TABLE 1: Site × Month Matrix (Total Usage / Emissions / Spend per Site per Month) */}
-      <div className="card-surface rounded-2xl overflow-hidden">
-        <div className="p-5 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+      {/* =====================================================================
+          05 / LIVE CROSS-TABULATION MATRIX: TOTAL PER SITE PER MONTH
+      ===================================================================== */}
+      <section className="ag-card rounded-[28px] overflow-hidden">
+        <div className="p-7 border-b border-[#121211]/[0.08] flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600">
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D9381E]">
               <Table2 className="w-3.5 h-3.5" />
-              <span>Live Cross-Tabulation Matrix</span>
+              <span>05 / Cross-Tabulation Pivot Matrix</span>
             </div>
-            <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
-              {metricMeta.label} — Per Site, Per Month ({selectedYear})
+            <h3 className="font-editorial text-2xl text-[#121211] mt-1">
+              {metricMeta.label} — Per Site, Per Month (
+              {selectedYear === 'All Years' ? 'All Years' : selectedYear})
             </h3>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
-            {[
-              { id: 'usage', label: 'Total Usage' },
-              { id: 'co2e', label: 'Emissions (tCO₂e)' },
-              { id: 'gross', label: 'Gross Spend (£)' },
-              { id: 'net', label: 'Net Spend (£)' },
-            ].map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setActiveMetric(m.id)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                  activeMetric === m.id
-                    ? 'bg-white text-blue-600 shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 text-xs text-[#575550]">
+            <span>Active Stream:</span>
+            <span className="font-medium px-3 py-1 rounded-full bg-[#EFECE6] text-[#121211]">
+              {selectedUtility === 'all'
+                ? 'All Utilities Combined'
+                : selectedUtility === 'electricity'
+                ? 'Electricity (kWh)'
+                : selectedUtility === 'natural_gas'
+                ? 'Natural Gas (kWh)'
+                : 'Water (m³)'}
+            </span>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="py-3 px-4 sticky left-0 bg-slate-50 z-10 min-w-[180px]">
+              <tr className="bg-[#EFECE6]/60 border-b border-[#121211]/10 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#575550]">
+                <th className="py-4 px-5 sticky left-0 bg-[#F6F5F0] z-10">
                   Site Name
                 </th>
                 {MONTH_LABELS.map((m) => (
-                  <th key={m.num} className="py-3 px-3 text-right">
+                  <th key={m.num} className="py-4 px-3 text-right">
                     {m.short}
                   </th>
                 ))}
-                <th className="py-3 px-4 text-right bg-blue-50/50 text-blue-900">
-                  YTD Total
+                <th className="py-4 px-5 text-right bg-[#EFECE6] text-[#121211]">
+                  Annual Total
                 </th>
-                <th className="py-3 px-4 text-right bg-slate-100/70 text-slate-700">
+                <th className="py-4 px-5 text-right bg-[#EFECE6]/50 text-[#575550]">
                   Monthly Avg
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200/80">
+            <tbody className="divide-y divide-[#121211]/[0.06] text-xs">
               {SITES.map((siteName) => {
-                const palette = SITE_COLORS[siteName];
-                let rowTotal = 0;
-                let monthsWithData = 0;
-
-                const monthCells = analytics.monthsArray.map((mObj) => {
-                  const cellVal = metricMeta.getVal(mObj.bySite[siteName]);
-                  rowTotal += cellVal;
-                  if (cellVal > 0) monthsWithData += 1;
-                  return { monthNum: mObj.monthNum, val: cellVal };
-                });
-
-                const rowAvg =
-                  monthsWithData > 0 ? rowTotal / monthsWithData : 0;
+                if (selectedSite !== 'All Sites' && selectedSite !== siteName) {
+                  return null;
+                }
+                const siteRowObj = analytics.siteSeries.find(
+                  (s) => s.siteName === siteName
+                );
+                const annualTotal = siteRowObj
+                  ? metricMeta.getVal(siteRowObj)
+                  : 0;
+                const activeCount = Math.max(
+                  1,
+                  siteRowObj?.activeMonths?.size || 1
+                );
+                const monthlyAvg = annualTotal / activeCount;
 
                 return (
                   <tr
                     key={siteName}
-                    className="hover:bg-slate-50/90 transition-colors"
+                    className="hover:bg-[#EFECE6]/40 transition-colors"
                   >
-                    <td className="py-3.5 px-4 font-bold text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-100">
-                      <div className="flex items-center gap-2">
+                    <td className="py-4 px-5 font-medium text-[#121211] sticky left-0 bg-white whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full shrink-0 ${palette.dotClass}`}
+                          className={`w-2.5 h-2.5 rounded-full ${SITE_EDITORIAL_META[siteName].dotClass}`}
                         />
                         <span>{siteName}</span>
                       </div>
                     </td>
-                    {monthCells.map((cell) => (
-                      <td
-                        key={cell.monthNum}
-                        className={`py-3.5 px-3 text-right font-semibold ${
-                          cell.val > 0 ? 'text-slate-900' : 'text-slate-300'
-                        }`}
-                      >
-                        {cell.val > 0 ? formatMetricNumber(cell.val) : '—'}
-                      </td>
-                    ))}
-                    <td className="py-3.5 px-4 text-right font-extrabold text-blue-700 bg-blue-50/30">
-                      {formatMetricNumber(rowTotal)}
+                    {MONTH_LABELS.map((m) => {
+                      const cellObj =
+                        analytics.monthsArray.find((x) => x.monthNum === m.num)
+                          ?.bySite[siteName] || {};
+                      const cellVal = metricMeta.getVal(cellObj);
+                      return (
+                        <td
+                          key={m.num}
+                          className={`py-4 px-3 text-right tabular-nums ${
+                            cellVal > 0
+                              ? 'font-medium text-[#121211]'
+                              : 'text-[#8C8982]/40'
+                          }`}
+                        >
+                          {cellVal > 0
+                            ? formatMetricNumber(
+                                cellVal,
+                                activeMetric === 'co2e' ? 2 : 0
+                              )
+                            : '—'}
+                        </td>
+                      );
+                    })}
+                    <td className="py-4 px-5 text-right font-semibold text-[#121211] bg-[#EFECE6]/40 whitespace-nowrap">
+                      {formatMetricNumber(annualTotal)}{' '}
+                      {metricMeta.prefix ? '' : metricMeta.unit}
                     </td>
-                    <td className="py-3.5 px-4 text-right font-bold text-slate-700 bg-slate-50/60">
-                      {formatMetricNumber(rowAvg)}
+                    <td className="py-4 px-5 text-right font-medium text-[#575550] bg-[#EFECE6]/20 whitespace-nowrap">
+                      {formatMetricNumber(monthlyAvg)}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
-              <tr className="bg-slate-900 text-white font-extrabold text-xs">
-                <td className="py-3.5 px-4 sticky left-0 bg-slate-900 z-10">
-                  Total Across All Sites ({metricMeta.unit})
+              <tr className="bg-[#121211] text-[#F6F5F0] text-xs font-semibold">
+                <td className="py-4 px-5 sticky left-0 bg-[#121211]">
+                  Portfolio Total
                 </td>
-                {analytics.monthsArray.map((mObj) => {
-                  const colVal = metricMeta.getVal(mObj);
+                {analytics.monthsArray.map((m) => {
+                  const val = metricMeta.getVal(m);
                   return (
-                    <td key={mObj.monthNum} className="py-3.5 px-3 text-right">
-                      {colVal > 0 ? formatMetricNumber(colVal) : '—'}
+                    <td key={m.monthNum} className="py-4 px-3 text-right">
+                      {val > 0
+                        ? formatMetricNumber(
+                            val,
+                            activeMetric === 'co2e' ? 2 : 0
+                          )
+                        : '—'}
                     </td>
                   );
                 })}
-                <td className="py-3.5 px-4 text-right text-sky-300 bg-slate-950">
-                  {formatMetricNumber(companyMetricTotal)}
+                <td className="py-4 px-5 text-right text-[#D9381E] whitespace-nowrap">
+                  {formatMetricNumber(companyMetricTotal)}{' '}
+                  {metricMeta.prefix ? '' : metricMeta.unit}
                 </td>
-                <td className="py-3.5 px-4 text-right text-slate-300 bg-slate-950">
-                  {formatMetricNumber(companyMetricTotal / 12)}
+                <td className="py-4 px-5 text-right text-white/70 whitespace-nowrap">
+                  {formatMetricNumber(companyMetricTotal / 12)} / mo
                 </td>
               </tr>
             </tfoot>
           </table>
         </div>
-      </div>
+      </section>
 
-      {/* LIVE SUMMARY TABLE 2 & 3: Comprehensive Site Breakdown & Supplier Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Comprehensive Site Multi-Utility Summary Table */}
-        <div className="lg:col-span-2 card-surface rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-slate-200/80">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
-              Site-Level Multi-Utility Ledger Summary
+      {/* =====================================================================
+          06 / MULTI-UTILITY SITE & SUPPLIER BREAKDOWN TABLES
+      ===================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
+        {/* Table A: Complete Site Breakdown */}
+        <div className="lg:col-span-7 ag-card rounded-[28px] overflow-hidden">
+          <div className="p-6 border-b border-[#121211]/[0.08] flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D9381E]">
+                Site Summary Ledger
+              </div>
+              <h3 className="font-editorial text-2xl text-[#121211] mt-0.5">
+                Multi-Utility Consumption &amp; Spend by Site
+              </h3>
             </div>
-            <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
-              Total Usage, Emissions & Spend by Site Name
-            </h3>
+            <button
+              type="button"
+              onClick={() => onSwitchTab('invoices')}
+              className="inline-flex items-center gap-1 text-xs font-medium text-[#121211] hover:text-[#D9381E] transition-colors"
+            >
+              <span>Full Audit Ledger</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-4">Site Name</th>
-                  <th className="py-3 px-3 text-right">Electricity</th>
-                  <th className="py-3 px-3 text-right">Natural Gas</th>
-                  <th className="py-3 px-3 text-right">Water</th>
-                  <th className="py-3 px-3 text-right">Emissions</th>
-                  <th className="py-3 px-3 text-right">Net (£)</th>
-                  <th className="py-3 px-3 text-right">VAT (£)</th>
-                  <th className="py-3 px-4 text-right">Gross (£ GBP)</th>
+                <tr className="bg-[#EFECE6]/50 border-b border-[#121211]/10 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#575550]">
+                  <th className="py-3.5 px-5">Site Name</th>
+                  <th className="py-3.5 px-3 text-right">Electricity</th>
+                  <th className="py-3.5 px-3 text-right">Natural Gas</th>
+                  <th className="py-3.5 px-3 text-right">Water</th>
+                  <th className="py-3.5 px-3 text-right">GHG (tCO₂e)</th>
+                  <th className="py-3.5 px-5 text-right">Gross (£ GBP)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200/80">
-                {analytics.siteSeries.map((site) => {
-                  const palette = SITE_COLORS[site.siteName];
-                  return (
-                    <tr
-                      key={site.siteName}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="py-3.5 px-4 font-bold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-2.5 h-2.5 rounded-full ${palette.dotClass}`}
-                          />
-                          <div>
-                            <div>{site.siteName}</div>
-                            <div className="text-[11px] font-normal text-slate-400">
-                              {site.invoiceCount} invoices · {site.actualCount}{' '}
-                              actual
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-semibold text-slate-800">
-                        {site.electricityKwh.toLocaleString('en-GB', {
-                          maximumFractionDigits: 0,
-                        })}{' '}
-                        <span className="text-slate-400">kWh</span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-semibold text-slate-800">
-                        {site.gasKwh.toLocaleString('en-GB', {
-                          maximumFractionDigits: 0,
-                        })}{' '}
-                        <span className="text-slate-400">kWh</span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-semibold text-slate-800">
-                        {site.waterM3.toLocaleString('en-GB', {
-                          maximumFractionDigits: 1,
-                        })}{' '}
-                        <span className="text-slate-400">m³</span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-extrabold text-blue-700">
-                        {site.totalCo2e.toFixed(3)}{' '}
-                        <span className="text-slate-400 font-normal">t</span>
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-semibold text-slate-700">
-                        £
-                        {site.netCost.toLocaleString('en-GB', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td className="py-3.5 px-3 text-right font-semibold text-slate-700">
-                        £
-                        {site.vatAmount.toLocaleString('en-GB', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
-                        £
-                        {site.grossCost.toLocaleString('en-GB', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
-                    </tr>
-                  );
-                })}
+              <tbody className="divide-y divide-[#121211]/[0.06] text-xs">
+                {analytics.siteSeries.map((s) => (
+                  <tr
+                    key={s.siteName}
+                    onClick={() =>
+                      onSelectSite(
+                        selectedSite === s.siteName ? 'All Sites' : s.siteName
+                      )
+                    }
+                    className="hover:bg-[#EFECE6]/40 cursor-pointer transition-colors"
+                  >
+                    <td className="py-4 px-5 font-medium text-[#121211]">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            SITE_EDITORIAL_META[s.siteName].dotClass
+                          }`}
+                        />
+                        <span>{s.siteName}</span>
+                      </div>
+                      <div className="text-[10px] text-[#8C8982] pl-4">
+                        {s.invoiceCount} invoices ({s.actualCount} Actual)
+                      </div>
+                    </td>
+                    <td className="py-4 px-3 text-right font-medium text-[#121211]">
+                      {s.electricityKwh.toLocaleString('en-GB', {
+                        maximumFractionDigits: 0,
+                      })}{' '}
+                      <span className="text-[10px] text-[#8C8982]">kWh</span>
+                    </td>
+                    <td className="py-4 px-3 text-right font-medium text-[#121211]">
+                      {s.gasKwh.toLocaleString('en-GB', {
+                        maximumFractionDigits: 0,
+                      })}{' '}
+                      <span className="text-[10px] text-[#8C8982]">kWh</span>
+                    </td>
+                    <td className="py-4 px-3 text-right font-medium text-[#121211]">
+                      {s.waterM3.toFixed(1)}{' '}
+                      <span className="text-[10px] text-[#8C8982]">m³</span>
+                    </td>
+                    <td className="py-4 px-3 text-right font-semibold text-[#1B4332]">
+                      {s.totalCo2e.toFixed(3)} t
+                    </td>
+                    <td className="py-4 px-5 text-right font-semibold text-[#121211]">
+                      £
+                      {s.grossCost.toLocaleString('en-GB', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Utilities Provider Summary Table */}
-        <div className="card-surface rounded-2xl overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="p-5 border-b border-slate-200/80">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
-                Provider Allocation
-              </div>
-              <h3 className="text-base font-extrabold text-slate-900 mt-0.5">
-                Summary by Utilities Provider
-              </h3>
+        {/* Table B: Utilities Provider Summary (EDF, SSE, EON, Octopus) */}
+        <div className="lg:col-span-5 ag-card rounded-[28px] overflow-hidden">
+          <div className="p-6 border-b border-[#121211]/[0.08]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#D9381E]">
+              Contracted UK Suppliers
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    <th className="py-3 px-4">Supplier</th>
-                    <th className="py-3 px-3 text-right">Usage (kWh)</th>
-                    <th className="py-3 px-3 text-right">CO₂e</th>
-                    <th className="py-3 px-4 text-right">Gross (£)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200/80">
-                  {analytics.supplierSeries.map((sup) => {
-                    const combinedKwh = sup.electricityKwh + sup.gasKwh;
-                    return (
-                      <tr
-                        key={sup.supplier}
-                        className="hover:bg-slate-50/80 transition-colors"
-                      >
-                        <td className="py-3.5 px-4 font-bold text-slate-900">
-                          <div>{sup.supplier}</div>
-                          <div className="text-[11px] font-normal text-slate-400">
-                            {sup.invoiceCount}{' '}
-                            {sup.invoiceCount === 1 ? 'invoice' : 'invoices'}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-3 text-right font-semibold text-slate-800">
-                          {combinedKwh.toLocaleString('en-GB', {
-                            maximumFractionDigits: 0,
-                          })}
-                        </td>
-                        <td className="py-3.5 px-3 text-right font-bold text-blue-700">
-                          {sup.totalCo2e.toFixed(3)}t
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-extrabold text-slate-900">
-                          £
-                          {sup.grossCost.toLocaleString('en-GB', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <h3 className="font-editorial text-2xl text-[#121211] mt-0.5">
+              Summary by Utilities Provider
+            </h3>
           </div>
 
-          <div className="p-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between text-xs text-slate-500">
-            <span>PDF Documents Stored in DB:</span>
-            <span className="font-bold text-slate-800">
-              {analytics.pdfAttachedCount} / {filteredInvoices.length} invoices
-            </span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#EFECE6]/50 border-b border-[#121211]/10 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#575550]">
+                  <th className="py-3.5 px-5">Provider</th>
+                  <th className="py-3.5 px-3 text-right">Net (£)</th>
+                  <th className="py-3.5 px-3 text-right">VAT (£)</th>
+                  <th className="py-3.5 px-5 text-right">Gross (£)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#121211]/[0.06] text-xs">
+                {analytics.supplierSeries.map((sup) => (
+                  <tr
+                    key={sup.supplier}
+                    onClick={() =>
+                      setSelectedSupplier(
+                        selectedSupplier === sup.supplier ? 'all' : sup.supplier
+                      )
+                    }
+                    className="hover:bg-[#EFECE6]/40 cursor-pointer transition-colors"
+                  >
+                    <td className="py-4 px-5">
+                      <div className="font-medium text-[#121211]">
+                        {sup.supplier}
+                      </div>
+                      <div className="text-[10px] text-[#8C8982]">
+                        {sup.invoiceCount} invoices ·{' '}
+                        {sup.totalCo2e.toFixed(2)} tCO₂e
+                      </div>
+                    </td>
+                    <td className="py-4 px-3 text-right font-medium text-[#575550]">
+                      £
+                      {sup.netCost.toLocaleString('en-GB', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="py-4 px-3 text-right font-medium text-[#8C8982]">
+                      £
+                      {sup.vatAmount.toLocaleString('en-GB', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="py-4 px-5 text-right font-semibold text-[#121211]">
+                      £
+                      {sup.grossCost.toLocaleString('en-GB', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

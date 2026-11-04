@@ -6,6 +6,7 @@ import {
   UploadCloud,
   Lock,
   ShieldCheck,
+  ArrowUpRight,
 } from 'lucide-react';
 import DashboardView from './components/DashboardView.jsx';
 import InvoiceTable from './components/InvoiceTable.jsx';
@@ -69,7 +70,6 @@ export default function App() {
       );
       const remoteInvoices = remoteRepoData?.invoices || [];
 
-      // Check if this browser has a stored Owner GitHub Token for Mhutt97
       let ownerVerified = false;
       let ownerLogin = null;
       const storedToken = initialState.backendConfig.github?.token?.trim();
@@ -89,15 +89,12 @@ export default function App() {
       setVerifiedOwnerLogin(ownerLogin);
 
       if (ownerVerified) {
-        // Owner browser: merge remote repository data with any local unsynced owner records
         const merged = mergeRemoteAndLocalInvoices(remoteInvoices, localIdb);
         setInvoices(merged);
         if (localIdb.length > remoteInvoices.length) {
           setHasUnsyncedLocal(true);
         }
       } else {
-        // Public Read-Only Visitor: display authoritative shared repository invoices
-        // (or fallback to localIdb only if the shared repo hasn't been initialized yet)
         if (remoteInvoices.length > 0) {
           setInvoices(remoteInvoices);
         } else if (localIdb.length > 0) {
@@ -135,13 +132,12 @@ export default function App() {
 
   const handleRequestOwnerUnlock = () => {
     showToast(
-      `Data input & edits are locked to repository owner (${AUTHORIZED_GITHUB_OWNER}). Enter your GitHub PAT to unlock.`,
+      `Data input & edits are locked to repository owner (${AUTHORIZED_GITHUB_OWNER}). Authenticate to unlock.`,
       'info'
     );
     setIsBackendModalOpen(true);
   };
 
-  // Serialized cloud sync queue to publish owner changes for all website visitors
   const triggerAutoSyncIfEnabled = (nextInvoices, nextProfile) => {
     if (!isOwnerUnlocked) return;
 
@@ -273,83 +269,66 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-[#0f172a]">
-      {/* Top Sticky Midnight Navy Glass Command Bar */}
-      <header
-        className="sticky top-0 z-30 no-print text-white"
-        style={{
-          background: 'rgba(7, 13, 25, 0.90)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
-          borderBottom: '1px solid rgba(56, 189, 248, 0.14)',
-        }}
-      >
-        <div className="max-w-[1340px] mx-auto px-4 sm:px-6 h-[66px] flex items-center justify-between gap-4">
-          {/* Brand Lockup */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div
-              className="w-[34px] h-[34px] rounded-[9px] flex items-center justify-center font-black text-sm tracking-tight text-white shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
-                boxShadow:
-                  '0 4px 14px rgba(37, 99, 235, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-              }}
-            >
-              ESG
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-[18.5px] font-extrabold tracking-[-0.035em] text-white leading-none">
-                UK Energy & ESG Intelligence
+    <div className="min-h-screen flex flex-col bg-[#F6F5F0] text-[#121211] selection:bg-[#D9381E] selection:text-white">
+      {/* Anti-Gravity Floating Glass Capsule Navigation */}
+      <div className="sticky top-5 z-40 px-4 sm:px-8 lg:px-12 no-print pointer-events-none">
+        <header className="max-w-[1440px] mx-auto ag-glass-pill rounded-full px-5 sm:px-7 h-[64px] flex items-center justify-between gap-4 pointer-events-auto transition-all">
+          {/* Editorial Brand Lockup */}
+          <div className="flex items-center gap-3.5 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D9381E] shrink-0" />
+            <div className="flex items-baseline gap-2.5">
+              <span className="font-editorial text-2xl sm:text-[26px] font-normal tracking-tight text-[#121211] leading-none">
+                Aether<span className="italic font-normal text-[#575550]">ESG</span>
               </span>
-              <span
-                className="hidden sm:inline-flex items-center text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-full"
-                style={{
-                  background: 'rgba(37, 99, 235, 0.18)',
-                  border: '1px solid rgba(96, 165, 250, 0.28)',
-                  color: '#bfdbfe',
-                }}
-              >
-                UK DEFRA · GBP (£)
+              <span className="hidden md:inline-block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8C8982] border-l border-[#121211]/15 pl-2.5">
+                UK Energy Monograph · GBP (£)
               </span>
             </div>
           </div>
 
-          {/* Center Navigation Tabs */}
-          <nav className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+          {/* Center Weightless Pill Switcher */}
+          <nav className="flex items-center gap-1 bg-[#EFECE6]/90 p-1 rounded-full border border-[#121211]/[0.06]">
             {[
               {
                 id: 'dashboard',
-                label: 'Site & Monthly Summaries',
+                index: '01',
+                label: 'Editorial & Site Telemetry',
                 icon: LayoutDashboard,
               },
               {
                 id: 'invoices',
-                label: 'Utility Invoices',
+                index: '02',
+                label: 'Utility Ledger',
                 badge: invoices.length,
                 icon: Receipt,
               },
             ].map((tab) => {
-              const Icon = tab.icon;
               const active = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 ${
                     active
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                      ? 'bg-[#121211] text-[#F6F5F0] shadow-sm'
+                      : 'text-[#575550] hover:text-[#121211]'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <span
+                    className={`text-[10px] tracking-widest uppercase ${
+                      active ? 'text-[#D9381E]' : 'text-[#8C8982]'
+                    }`}
+                  >
+                    {tab.index}
+                  </span>
                   <span>{tab.label}</span>
                   {tab.badge !== undefined && (
                     <span
-                      className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                      className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
                         active
-                          ? 'bg-blue-700 text-white'
-                          : 'bg-slate-800 text-slate-300'
+                          ? 'bg-white/15 text-white'
+                          : 'bg-[#121211]/[0.07] text-[#575550]'
                       }`}
                     >
                       {tab.badge}
@@ -360,17 +339,17 @@ export default function App() {
             })}
           </nav>
 
-          {/* Right Owner Lock Status & Quick Add Actions */}
+          {/* Right Owner Access Status & Floating Action */}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium border transition-all ${
                 isOwnerUnlocked && hasUnsyncedLocal
-                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-400/50'
+                  ? 'bg-amber-500/10 text-amber-900 border-amber-500/30 hover:bg-amber-500/20'
                   : isOwnerUnlocked
-                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/40'
-                  : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-slate-700/80'
+                  ? 'bg-[#1B4332]/[0.08] text-[#1B4332] border-[#1B4332]/25 hover:bg-[#1B4332]/15'
+                  : 'bg-white/80 hover:bg-white text-[#575550] border-[#121211]/10'
               }`}
               title={
                 isOwnerUnlocked
@@ -381,20 +360,18 @@ export default function App() {
               }
             >
               {isOwnerUnlocked && hasUnsyncedLocal ? (
-                <UploadCloud className="w-3.5 h-3.5 text-amber-300" />
+                <UploadCloud className="w-3.5 h-3.5 text-amber-700" />
               ) : isOwnerUnlocked ? (
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-[#1B4332]" />
               ) : (
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <Lock className="w-3 h-3 text-[#D9381E]" />
               )}
               <span className="hidden sm:inline">
                 {isOwnerUnlocked && hasUnsyncedLocal
-                  ? 'Publish for All Users'
+                  ? 'Publish Changes'
                   : isOwnerUnlocked
-                  ? `Owner Unlocked (${
-                      verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
-                    })`
-                  : `Read-Only · Owner Login`}
+                  ? `Owner · ${verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER}`
+                  : 'Read-Only · Owner Login'}
               </span>
             </button>
 
@@ -405,68 +382,67 @@ export default function App() {
                   setEditingInvoice(null);
                   setIsInvoiceModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all"
-                style={{
-                  background:
-                    'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
-                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium text-white bg-[#121211] hover:bg-[#D9381E] transition-colors duration-300 shadow-sm"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Log Invoice</span>
               </button>
             ) : (
-              <span
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900/60 text-slate-400 border border-slate-800 select-none"
+              <button
+                type="button"
+                onClick={handleRequestOwnerUnlock}
+                className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-medium bg-[#EFECE6] text-[#575550] hover:text-[#121211] transition-colors"
                 title={`Data input and edits are locked to ${AUTHORIZED_GITHUB_OWNER}`}
               >
-                <Lock className="w-3.5 h-3.5 text-slate-500" />
-                <span>Edits Locked</span>
-              </span>
+                <span>Unlock Input</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </button>
             )}
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
-      {/* Unsynced Local Changes Banner (only shown when Owner is unlocked and has unsynced local changes) */}
+      {/* Unsynced Local Owner Changes Floating Banner */}
       {isOwnerUnlocked && hasUnsyncedLocal && (
-        <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2.5 text-xs text-amber-950 no-print">
-          <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-2">
-            <div className="font-semibold">
-              <strong>Local Owner Changes Detected:</strong> You have logged
-              invoices in this browser that haven&apos;t been committed to{' '}
-              <code>data/esg-invoices.json</code> yet.
+        <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 mt-4 no-print">
+          <div className="ag-glass rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-3 border border-amber-500/30">
+            <div className="text-xs text-[#121211]">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#D9381E] mr-2" />
+              <strong>Unpublished Owner Edits:</strong> You have logged or
+              amended invoices in this browser that haven&apos;t been committed
+              to <code>data/esg-invoices.json</code> yet.
             </div>
             <button
               type="button"
               onClick={() => setIsBackendModalOpen(true)}
-              className="px-3 py-1 rounded-lg bg-amber-900 hover:bg-amber-800 text-white font-bold text-xs shrink-0"
+              className="px-3.5 py-1.5 rounded-full bg-[#121211] hover:bg-[#D9381E] text-white font-medium text-xs transition-colors shrink-0"
             >
-              Commit & Publish to GitHub →
+              Commit to GitHub Repository →
             </button>
           </div>
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Floating Editorial Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 no-print animate-fade-in">
+        <div className="fixed bottom-6 right-6 z-50 no-print animate-fade-in">
           <div
-            className={`px-4 py-2.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 ${
+            className={`px-5 py-3 rounded-full shadow-2xl border text-xs font-medium flex items-center gap-2.5 backdrop-blur-xl ${
               toast.type === 'error'
-                ? 'bg-rose-950 text-rose-200 border-rose-800'
+                ? 'bg-[#D9381E] text-white border-[#D9381E]'
                 : toast.type === 'info'
-                ? 'bg-amber-950 text-amber-200 border-amber-800'
-                : 'bg-slate-950 text-sky-300 border-slate-800'
+                ? 'bg-[#121211]/95 text-[#F6F5F0] border-white/15'
+                : 'bg-[#121211] text-[#F6F5F0] border-white/15'
             }`}
           >
+            <span className="w-2 h-2 rounded-full bg-[#D9381E] shrink-0" />
             <span>{toast.text}</span>
           </div>
         </div>
       )}
 
-      {/* Main Content Container */}
-      <main className="flex-1 max-w-[1340px] w-full mx-auto px-4 sm:px-6 py-7">
+      {/* Main Asymmetric Editorial Container */}
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 pt-8 pb-20">
         {activeTab === 'dashboard' && (
           <DashboardView
             invoices={invoices}
@@ -517,20 +493,29 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200/90 py-4 px-6 text-xs font-semibold text-slate-400 no-print">
-        <div className="max-w-[1340px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div>
-            UK BUSINESS ENERGY & ESG LEDGER · HEAD OFFICE LONDON · OFFICE
-            SHEFFIELD · OFFICE LEEDS · OFFICE BRISTOL
+      {/* Minimalist Editorial Colophon Footer */}
+      <footer className="border-t border-[#121211]/[0.08] py-10 px-4 sm:px-8 lg:px-12 text-xs text-[#8C8982] no-print bg-[#F6F5F0]">
+        <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="font-editorial text-xl text-[#121211]">
+              Aether<span className="italic text-[#575550]">ESG</span>
+            </span>
+            <span className="text-[11px] uppercase tracking-[0.16em]">
+              UK Commercial Energy & Carbon Ledger · London · Sheffield · Leeds · Bristol
+            </span>
           </div>
-          <div>
-            CURRENCY: GBP (£) · SUPPLIERS: EDF, SSE, EON, OCTOPUS ·{' '}
-            {isOwnerUnlocked
-              ? `OWNER UNLOCKED (${
-                  verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
-                })`
-              : `PUBLIC READ-ONLY MODE (LOCKED TO ${AUTHORIZED_GITHUB_OWNER})`}
+          <div className="flex flex-wrap items-center gap-4 text-[11px] uppercase tracking-[0.14em]">
+            <span>Suppliers: EDF · SSE · EON · Octopus</span>
+            <span>·</span>
+            <span>Currency: GBP (£)</span>
+            <span>·</span>
+            <span className="text-[#121211] font-medium">
+              {isOwnerUnlocked
+                ? `Owner Unlocked (${
+                    verifiedOwnerLogin || AUTHORIZED_GITHUB_OWNER
+                  })`
+                : `Read-Only Edition (${AUTHORIZED_GITHUB_OWNER})`}
+            </span>
           </div>
         </div>
       </footer>
@@ -571,7 +556,6 @@ export default function App() {
         onOwnerVerified={async (token, ownerLogin) => {
           setIsOwnerUnlocked(true);
           setVerifiedOwnerLogin(ownerLogin);
-          // Merge any local owner invoices from IndexedDB once unlocked
           const localIdb = await loadInvoicesFromIndexedDb();
           if (Array.isArray(localIdb) && localIdb.length > 0) {
             setInvoices((prev) => {

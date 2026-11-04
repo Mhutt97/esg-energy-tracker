@@ -301,42 +301,35 @@ export default function BackendConfigModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/55 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
         {/* Header */}
-        <div
-          className="px-6 py-4 text-white flex items-center justify-between"
-          style={{
-            background: 'rgba(7, 13, 25, 0.96)',
-            borderBottom: '1px solid rgba(56, 189, 248, 0.16)',
-          }}
-        >
+        <div className="px-7 py-5 bg-[#121211] text-[#F6F5F0] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-extrabold tracking-tight">
-              Database & Cloud Backend Configuration
+            <div className="text-[10px] uppercase tracking-[0.2em] text-[#D9381E]">
+              Owner Authentication &amp; Cloud Sync
+            </div>
+            <h2 className="font-editorial text-2xl tracking-tight mt-0.5">
+              Database &amp; Repository Access Control
             </h2>
-            <p className="text-xs text-slate-300">
-              IndexedDB + GitHub REST API + Google Sheets persistence
-            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg"
+            className="text-white/60 hover:text-white p-1.5 rounded-full"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Storage Diagnostics Strip */}
-        <div className="px-6 py-2.5 bg-slate-900 text-slate-200 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-slate-800">
-          <span className="font-semibold">
+        <div className="px-7 py-2.5 bg-[#EFECE6] text-[#121211] text-xs flex flex-wrap items-center justify-between gap-2 border-b border-[#121211]/10">
+          <span className="font-medium">
             Ledger Records: <strong>{diagnostics.invoiceCount}</strong> · Stored
             PDFs: <strong>{diagnostics.pdfCount}</strong>
           </span>
-          <span className="text-sky-300 font-bold">
-            Database Size: {diagnostics.totalKb} KB (IndexedDB + LocalStorage
-            Active)
+          <span className="text-[#575550] font-medium">
+            Database Size: {diagnostics.totalKb} KB (IndexedDB + GitHub API)
           </span>
         </div>
 

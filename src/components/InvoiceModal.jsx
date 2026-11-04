@@ -233,21 +233,21 @@ export default function InvoiceModal({
   const errorList = Object.values(validation.errors);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-[2px] p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/55 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
         {/* Editorial Header */}
-        <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b border-slate-800">
+        <div className="px-7 py-5 bg-[#121211] text-[#F6F5F0] flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">
                 Ledger Entry Form
               </span>
-              <span className="text-slate-700">•</span>
-              <span className="text-[10px] uppercase tracking-[0.14em] text-teal-400">
+              <span className="text-white/30">·</span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[#D9381E]">
                 UK DEFRA Verified
               </span>
             </div>
-            <h2 className="text-base font-semibold tracking-tight mt-0.5">
+            <h2 className="font-editorial text-2xl tracking-tight mt-0.5">
               {editingInvoice
                 ? 'Amend Utility Invoice Record'
                 : 'Log Utility Invoice'}
@@ -256,7 +256,7 @@ export default function InvoiceModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors"
+            className="text-white/60 hover:text-white p-1.5 rounded-full transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -794,22 +794,22 @@ export default function InvoiceModal({
           </div>
 
           {/* Submit Footer */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-            <span className="text-[11px] text-slate-400">
-              All fields marked with <span className="text-red-500">*</span> are
-              mandatory for ESG audit integrity.
+          <div className="flex items-center justify-between pt-3 border-t border-[#121211]/10">
+            <span className="text-[11px] text-[#8C8982]">
+              All fields marked with <span className="text-[#D9381E]">*</span>{' '}
+              are mandatory for ESG audit integrity.
             </span>
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2.5 rounded-full text-xs font-medium text-[#575550] hover:bg-[#EFECE6] transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors"
+                className="px-6 py-2.5 rounded-full text-xs font-medium bg-[#121211] hover:bg-[#D9381E] text-white shadow-xs transition-colors duration-300"
               >
                 {editingInvoice ? 'Save Amended Record' : 'Commit Invoice Entry'}
               </button>
