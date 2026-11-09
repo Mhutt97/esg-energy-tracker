@@ -233,21 +233,21 @@ export default function InvoiceModal({
   const errorList = Object.values(validation.errors);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/55 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-2xl w-full overflow-hidden my-6">
-        {/* Editorial Header */}
-        <div className="px-7 py-5 bg-[#121211] text-[#F6F5F0] flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded border border-slate-300 max-w-2xl w-full overflow-hidden my-6">
+        {/* B2B Modal Header */}
+        <div className="px-4 py-3 bg-slate-900 text-slate-100 flex items-center justify-between border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/60">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Ledger Entry Form
               </span>
-              <span className="text-white/30">·</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-[#D9381E]">
-                UK DEFRA Verified
+              <span className="text-slate-600">·</span>
+              <span className="text-[10px] font-mono-num font-bold uppercase tracking-wider text-emerald-400">
+                DEFRA 2025/2026
               </span>
             </div>
-            <h2 className="font-editorial text-2xl tracking-tight mt-0.5">
+            <h2 className="text-sm font-bold tracking-tight text-white mt-0.5">
               {editingInvoice
                 ? 'Amend Utility Invoice Record'
                 : 'Log Utility Invoice'}
@@ -256,7 +256,7 @@ export default function InvoiceModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1.5 rounded-full transition-colors"
+            className="text-slate-400 hover:text-white p-1 rounded"
           >
             <X className="w-4 h-4" />
           </button>
@@ -265,7 +265,7 @@ export default function InvoiceModal({
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
+          className="p-4 space-y-4 max-h-[82vh] overflow-y-auto"
         >
           {/* Validation Error Banner (shown if submit attempted with errors) */}
           {submitAttempted && errorList.length > 0 && (
@@ -794,22 +794,22 @@ export default function InvoiceModal({
           </div>
 
           {/* Submit Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-[#121211]/10">
-            <span className="text-[11px] text-[#8C8982]">
-              All fields marked with <span className="text-[#D9381E]">*</span>{' '}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+            <span className="text-[11px] text-slate-500">
+              All fields marked with <span className="text-red-600">*</span>{' '}
               are mandatory for ESG audit integrity.
             </span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-full text-xs font-medium text-[#575550] hover:bg-[#EFECE6] transition-colors"
+                className="px-3 py-1.5 rounded border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-full text-xs font-medium bg-[#121211] hover:bg-[#D9381E] text-white shadow-xs transition-colors duration-300"
+                className="px-4 py-1.5 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {editingInvoice ? 'Save Amended Record' : 'Commit Invoice Entry'}
               </button>

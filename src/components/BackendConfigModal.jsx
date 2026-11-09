@@ -301,34 +301,34 @@ export default function BackendConfigModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/55 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-2xl w-full overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded border border-slate-300 max-w-2xl w-full overflow-hidden my-8">
         {/* Header */}
-        <div className="px-7 py-5 bg-[#121211] text-[#F6F5F0] flex items-center justify-between">
+        <div className="px-4 py-3 bg-slate-900 text-slate-100 flex items-center justify-between border-b border-slate-800">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[#D9381E]">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
               Owner Authentication &amp; Cloud Sync
             </div>
-            <h2 className="font-editorial text-2xl tracking-tight mt-0.5">
+            <h2 className="text-sm font-bold tracking-tight text-white mt-0.5">
               Database &amp; Repository Access Control
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1.5 rounded-full"
+            className="text-slate-400 hover:text-white p-1 rounded"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Storage Diagnostics Strip */}
-        <div className="px-7 py-2.5 bg-[#EFECE6] text-[#121211] text-xs flex flex-wrap items-center justify-between gap-2 border-b border-[#121211]/10">
+        <div className="px-4 py-2 bg-slate-100 text-slate-800 text-[11px] flex flex-wrap items-center justify-between gap-2 border-b border-slate-200">
           <span className="font-medium">
-            Ledger Records: <strong>{diagnostics.invoiceCount}</strong> · Stored
-            PDFs: <strong>{diagnostics.pdfCount}</strong>
+            Ledger Records: <strong className="font-mono-num">{diagnostics.invoiceCount}</strong> · Stored
+            PDFs: <strong className="font-mono-num">{diagnostics.pdfCount}</strong>
           </span>
-          <span className="text-[#575550] font-medium">
+          <span className="text-slate-600 font-mono-num">
             Database Size: {diagnostics.totalKb} KB (IndexedDB + GitHub API)
           </span>
         </div>

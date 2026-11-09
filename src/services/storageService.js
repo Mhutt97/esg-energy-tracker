@@ -1108,3 +1108,115 @@ export function parseJsonBackup(jsonText) {
         : null,
   };
 }
+
+/**
+ * Generates an XBRL / ESRS-tagged XML audit report for institutional ESG assurance
+ */
+export function exportAuditXbrlReport(
+  invoices = [],
+  framework = 'CSRD',
+  reportingYear = '2026',
+  tenantName = 'UK Commercial Holdings Ltd'
+) {
+  let scope1Tonnes = 0;
+  let scope2Tonnes = 0;
+  let waterTonnes = 0;
+  let totalEnergyKwh = 0;
+  let totalWaterM3 = 0;
+  let totalNetGbp = 0;
+  let totalGrossGbp = 0;
+
+  invoices.forEach((inv, idx) => {
+    const clean = sanitizeInvoiceRecord(inv, idx);
+    if (!clean) return;
+    const m = calculateInvoiceEsgMetrics(clean);
+    if (clean.category === 'electricity') {
+      scope2Tonnes += m.co2eTonnes;
+      totalEnergyKwh += m.normalizedEnergyKwh;
+    } else if (clean.category === 'natural_gas') {
+      scope1Tonnes += m.co2eTonnes;
+      totalEnergyKwh += m.normalizedEnergyKwh;
+    } else {
+      waterTonnes += m.co2eTonnes;
+      totalWaterM3 += m.normalizedWaterM3;
+    }
+    totalNetGbp += Number(clean.netCost) || 0;
+    totalGrossGbp += Number(clean.grossCost) || 0;
+  });
+
+  const totalGhg = scope1Tonnes + scope2Tonnes + waterTonnes;
+  const escapeXml = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<xbrl xmlns="http://www.xbrl.org/2003/instance"
+      xmlns:esrs="http://xbrl.efrag.org/taxonomy/esrs/2026"
+      xmlns:uksecr="http://xbrl.frc.org.uk/secr/2026"
+      xmlns:iso4217="http://www.xbrl.org/2003/iso4217">
+  <context id="CTX_${escapeXml(reportingYear)}">
+    <entity>
+      <identifier scheme="http://companieshouse.gov.uk">${escapeXml(
+        tenantName
+      )}</identifier>
+    </entity>
+    <period>
+      <startDate>${escapeXml(
+        reportingYear === 'All Years' ? '2026' : reportingYear
+      )}-01-01</startDate>
+      <endDate>${escapeXml(
+        reportingYear === 'All Years' ? '2026' : reportingYear
+      )}-12-31</endDate>
+    </period>
+  </context>
+  <esrs:ReportingFramework contextRef="CTX_${escapeXml(
+    reportingYear
+  )}">${escapeXml(framework)}</esrs:ReportingFramework>
+  <esrs:GrossScope1GHGEmissions contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="tCO2e" decimals="4">${scope1Tonnes.toFixed(
+    4
+  )}</esrs:GrossScope1GHGEmissions>
+  <esrs:GrossLocationBasedScope2GHGEmissions contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="tCO2e" decimals="4">${scope2Tonnes.toFixed(
+    4
+  )}</esrs:GrossLocationBasedScope2GHGEmissions>
+  <esrs:WaterSupplyAndTreatmentGHGEmissions contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="tCO2e" decimals="4">${waterTonnes.toFixed(
+    4
+  )}</esrs:WaterSupplyAndTreatmentGHGEmissions>
+  <esrs:TotalGHGEmissions contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="tCO2e" decimals="4">${totalGhg.toFixed(
+    4
+  )}</esrs:TotalGHGEmissions>
+  <esrs:TotalEnergyConsumptionMWh contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="MWh" decimals="3">${(totalEnergyKwh / 1000).toFixed(
+    3
+  )}</esrs:TotalEnergyConsumptionMWh>
+  <esrs:TotalWaterConsumptionM3 contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="m3" decimals="2">${totalWaterM3.toFixed(
+    2
+  )}</esrs:TotalWaterConsumptionM3>
+  <uksecr:TotalUtilityNetExpenditureGBP contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="iso4217:GBP" decimals="2">${totalNetGbp.toFixed(
+    2
+  )}</uksecr:TotalUtilityNetExpenditureGBP>
+  <uksecr:TotalUtilityGrossExpenditureGBP contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" unitRef="iso4217:GBP" decimals="2">${totalGrossGbp.toFixed(
+    2
+  )}</uksecr:TotalUtilityGrossExpenditureGBP>
+  <uksecr:VerifiedInvoiceRecordCount contextRef="CTX_${escapeXml(
+    reportingYear
+  )}" decimals="0">${invoices.length}</uksecr:VerifiedInvoiceRecordCount>
+</xbrl>`;
+}

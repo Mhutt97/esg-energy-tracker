@@ -3,153 +3,80 @@
 @tailwind utilities;
 
 :root {
-  /* Strict Modern Typography System:
-     1. Ultra-bold, extended neo-grotesque display header
-     2. Clean, low-contrast, minimalist sans-serif body text */
-  --font-display: "Archivo", "Satoshi", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-sans: "Inter", "Satoshi", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Sophisticated Muted Neutral Palette */
-  --canvas: #F6F5F0;
-  --canvas-subtle: #EFECE6;
-  --surface: #FFFFFF;
-  --surface-glass: rgba(255, 255, 255, 0.76);
-  --ink: #121211;
-  --ink-secondary: #575550;
-  --ink-muted: #8C8982;
-  --hairline: rgba(18, 18, 17, 0.08);
-  --hairline-strong: rgba(18, 18, 17, 0.15);
+  /* Utilitarian B2B Enterprise Palette (Slate / Zinc) */
+  --bg-canvas: #f1f5f9;      /* slate-100 */
+  --bg-panel: #ffffff;       /* white */
+  --bg-subtle: #f8fafc;      /* slate-50 */
+  --border-strict: #e2e8f0;  /* slate-200 */
+  --border-dark: #1e293b;    /* slate-800 */
+  --text-primary: #0f172a;   /* slate-900 */
+  --text-secondary: #475569; /* slate-600 */
+  --text-muted: #64748b;     /* slate-500 */
 
-  /* Sharp Intentional Editorial Accents */
-  --accent-vermilion: #D9381E;
-  --accent-forest: #1B4332;
-  --accent-cobalt: #1D3557;
-  --accent-ochre: #B45309;
-
-  /* Anti-Gravity Ambient Depth-of-Field Shadows */
-  --shadow-float-sm: 0 12px 32px -8px rgba(18, 18, 17, 0.045), 0 2px 6px -1px rgba(18, 18, 17, 0.02);
-  --shadow-float-md: 0 28px 64px -16px rgba(18, 18, 17, 0.075), 0 8px 20px -4px rgba(18, 18, 17, 0.03);
-  --shadow-float-lg: 0 48px 100px -24px rgba(18, 18, 17, 0.12), 0 16px 36px -8px rgba(18, 18, 17, 0.045);
+  /* Strictly Functional & Semantic Colors */
+  --sem-env: #059669;        /* Environmental: Muted Emerald/Sage */
+  --sem-soc: #2563eb;        /* Social / Water / Operations: Slate Blue */
+  --sem-gov: #4f46e5;        /* Governance / Audit / Compliance: Deep Indigo */
+  --sem-breach: #dc2626;     /* Breaches / Anomalies: Sharp Crimson */
+  --sem-warn: #d97706;       /* Warnings / Thresholds / Estimated: Amber */
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
-  font-variant-numeric: tabular-nums;
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
-  background-color: var(--canvas);
-  background-image: radial-gradient(ellipse 90% 45% at 50% 0%, rgba(255, 255, 255, 0.85) 0%, rgba(246, 245, 240, 0) 100%);
-  color: var(--ink);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
   font-family: var(--font-sans);
-  font-weight: 400;
-  letter-spacing: -0.011em;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ultra-Bold Extended Neo-Grotesque Header Class */
-.font-editorial,
-.font-display {
-  font-family: var(--font-display) !important;
-  font-weight: 850 !important;
-  font-stretch: 122%;
-  font-variation-settings: "wdth" 122, "wght" 850;
-  letter-spacing: -0.04em;
-  font-style: normal !important;
+/* Tabular Monospace Enforcement for Numbers, Units, Refs & Dates */
+.font-mono-num,
+.tabular-nums {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -0.02em;
 }
 
-/* Clean, Low-Contrast Minimalist Sans-Serif Body Class */
-.font-sans-clean {
-  font-family: var(--font-sans) !important;
-  font-weight: 400;
-  letter-spacing: -0.011em;
+/* Utilitarian 1px Bordered Panels (Zero Decorative Drop Shadows) */
+.b2b-panel {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-strict);
 }
 
-/* Anti-Gravity Floating Surfaces */
-.ag-card {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-float-sm);
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.35s ease;
+/* Subtle Zebra Striping for High-Density Enterprise Data Tables */
+.b2b-table tbody tr:nth-child(even) {
+  background-color: rgba(248, 250, 252, 0.75);
 }
 
-.ag-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-float-md);
-  border-color: var(--hairline-strong);
+.b2b-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.9);
 }
 
-.ag-card-static {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  box-shadow: var(--shadow-float-md);
+/* Custom Slim Scrollbars for High-Density Tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-.ag-glass {
-  background: var(--surface-glass);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow-float-md), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
-
-.ag-glass-pill {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid rgba(18, 18, 17, 0.08);
-  box-shadow: 0 20px 50px -12px rgba(18, 18, 17, 0.08), 0 4px 12px -2px rgba(18, 18, 17, 0.03);
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
 }
-
-.ag-float-deep {
-  box-shadow: var(--shadow-float-lg);
-}
-
-/* Editorial Image Frame */
-.editorial-photo {
-  filter: contrast(1.04) saturate(0.82);
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), filter 0.5s ease;
-}
-
-.group:hover .editorial-photo {
-  transform: scale(1.03);
-  filter: contrast(1.06) saturate(0.95);
-}
-
-@keyframes wordReveal {
-  0% {
-    opacity: 0;
-    transform: translateY(55%);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-word-reveal {
-  animation: wordReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 @media print {

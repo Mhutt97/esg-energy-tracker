@@ -24,13 +24,13 @@ import {
   SITES,
   SUPPLIERS,
   READING_TYPES,
+  REPORTING_FRAMEWORKS,
 } from '../data/emissionFactors.js';
 import {
   exportInvoicesToCsv,
   parseCsvToInvoices,
   createPdfBlobUrl,
 } from '../services/storageService.js';
-import { RevealText } from './AnimatedText.jsx';
 
 export default function InvoiceTable({
   invoices,
@@ -41,6 +41,7 @@ export default function InvoiceTable({
   onBulkImport,
   isOwnerUnlocked = false,
   onRequestOwnerUnlock,
+  selectedFramework = REPORTING_FRAMEWORKS.CSRD,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -171,254 +172,222 @@ export default function InvoiceTable({
 
   const getCategoryIcon = (cat) => {
     if (cat === 'electricity')
-      return <Zap className="w-3.5 h-3.5 text-[#121211] shrink-0" />;
+      return <Zap className="w-3 h-3 text-emerald-600 shrink-0" />;
     if (cat === 'natural_gas')
-      return <Flame className="w-3.5 h-3.5 text-[#D9381E] shrink-0" />;
-    return <Droplets className="w-3.5 h-3.5 text-[#1B4332] shrink-0" />;
+      return <Flame className="w-3 h-3 text-teal-600 shrink-0" />;
+    return <Droplets className="w-3 h-3 text-blue-600 shrink-0" />;
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Editorial Section Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#121211]/10 pb-6">
+    <div className="space-y-3">
+      {/* Compact Header & Controls Bar */}
+      <div className="b2b-panel rounded p-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9381E]">
-            02 / Primary Audit Archive
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Utility Invoice Audit Ledger
+            </h2>
+            <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono-num text-[10px] font-semibold text-slate-700">
+              {filtered.length} Records
+            </span>
+            <span className="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 font-mono-num text-[10px] font-semibold text-indigo-700">
+              {selectedFramework.label}
+            </span>
           </div>
-          <h1 className="font-editorial text-3xl sm:text-4xl text-[#121211] uppercase mt-1">
-            <RevealText text="Utility Invoices & Verified Meter Ledger" />
-          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Primary source invoice ledger with UK DEFRA conversion factors, GBP
+            (£) VAT breakdown, and embedded PDF documentation.
+          </p>
         </div>
 
-        {/* Legacy Excel Spreadsheet Ingestion Notice (Disabled for Testing Phase) */}
-        <div className="flex items-center gap-2.5 bg-[#EFECE6]/80 border border-[#121211]/[0.08] rounded-full px-4 py-2">
+        {/* Action Buttons + Disabled Excel Testing Notice */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-400 select-none">
+            <Lock className="w-3 h-3 text-amber-500" />
+            <span>Upload Legacy Excel (.xlsx)</span>
+            <span className="px-1 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-mono-num text-[9px] uppercase">
+              Testing
+            </span>
+          </div>
+
+          {isOwnerUnlocked && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Template
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import CSV
+              </button>
+            </>
+          )}
+
           <button
             type="button"
-            disabled
-            className="inline-flex items-center gap-2 text-xs font-medium text-[#8C8982] cursor-not-allowed select-none"
-            title="Legacy Excel (.xlsx / .xls) workbook upload is disabled during the current testing phase"
+            onClick={handleDownloadCsv}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded"
           >
-            <Lock className="w-3.5 h-3.5 text-[#8C8982]" />
-            <span>Upload Legacy Excel Spreadsheets (.xlsx)</span>
+            <Download className="w-3.5 h-3.5" />
+            Export CSV ({filtered.length})
           </button>
-          <span className="text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white text-[#575550] border border-[#121211]/10">
-            Testing Phase · Locked
-          </span>
+
+          {isOwnerUnlocked ? (
+            <button
+              type="button"
+              onClick={onAddInvoice}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Log Utility Invoice
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onRequestOwnerUnlock}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded"
+            >
+              <Lock className="w-3 h-3 text-amber-600" />
+              Unlock Edits
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Floating Glass Filter & Actions Bar */}
-      <div className="ag-glass rounded-[28px] p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-[#8C8982] absolute left-4 top-1/2 -translate-y-1/2" />
+      {/* Inline Filter Bar */}
+      <div className="b2b-panel rounded p-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {[
+            { id: 'all', label: 'All Streams' },
+            { id: 'electricity', label: 'Electricity (Scope 2)' },
+            { id: 'natural_gas', label: 'Natural Gas (Scope 1)' },
+            { id: 'water', label: 'Water (Scope 3)' },
+          ].map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setCategoryFilter(c.id)}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                categoryFilter === c.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter by invoice reference, date, supplier, site name, or PDF filename..."
-              className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-[#121211]/10 rounded-full focus:outline-none focus:border-[#121211] transition-colors"
+              placeholder="Filter invoice ref, date, PDF..."
+              className="w-full pl-8 pr-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded focus:outline-none focus:bg-white focus:border-slate-900"
             />
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {isOwnerUnlocked && (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#575550] bg-[#EFECE6] hover:bg-[#121211] hover:text-white rounded-full transition-colors"
-                  title="Download CSV template"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  CSV Template
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#121211] bg-white border border-[#121211]/15 hover:bg-[#EFECE6] rounded-full transition-colors"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Import CSV
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={handleDownloadCsv}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-[#121211] bg-white border border-[#121211]/15 hover:bg-[#EFECE6] rounded-full transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV ({filtered.length})
-            </button>
-            {isOwnerUnlocked ? (
-              <button
-                type="button"
-                onClick={onAddInvoice}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium text-white bg-[#121211] hover:bg-[#D9381E] rounded-full shadow-sm transition-colors duration-300"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Log Utility Invoice
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onRequestOwnerUnlock}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium text-white bg-[#121211] hover:bg-[#D9381E] rounded-full shadow-sm transition-colors duration-300"
-                title="Data input and edits are restricted to the repository owner (Mhutt97)"
-              >
-                <Lock className="w-3.5 h-3.5 text-[#D9381E]" />
-                Read-Only · Owner Unlock
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[#121211]/[0.07] text-xs">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] mr-1">
-              Stream:
-            </span>
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'electricity', label: 'Electricity (Scope 2)' },
-              { id: 'natural_gas', label: 'Natural Gas (Scope 1)' },
-              { id: 'water', label: 'Water' },
-            ].map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setCategoryFilter(c.id)}
-                className={`px-3.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  categoryFilter === c.id
-                    ? 'bg-[#121211] text-white'
-                    : 'bg-[#EFECE6] text-[#575550] hover:text-[#121211]'
-                }`}
-              >
-                {c.label}
-              </button>
+          <select
+            value={siteFilter}
+            onChange={(e) => setSiteFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-medium"
+          >
+            <option value="all">All Facilities</option>
+            {SITES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
-          </div>
+          </select>
 
-          <div className="flex flex-wrap items-center gap-2.5 ml-auto">
-            <span className="text-[11px] uppercase tracking-widest text-[#8C8982]">
-              Site:
-            </span>
-            <select
-              value={siteFilter}
-              onChange={(e) => setSiteFilter(e.target.value)}
-              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
-            >
-              <option value="all">All Sites</option>
-              {SITES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-medium"
+          >
+            <option value="all">All Suppliers</option>
+            {SUPPLIERS.map((sup) => (
+              <option key={sup} value={sup}>
+                {sup}
+              </option>
+            ))}
+          </select>
 
-            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] ml-1">
-              Supplier:
-            </span>
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
-            >
-              <option value="all">All Suppliers</option>
-              {SUPPLIERS.map((sup) => (
-                <option key={sup} value={sup}>
-                  {sup}
-                </option>
-              ))}
-            </select>
-
-            <span className="text-[11px] uppercase tracking-widest text-[#8C8982] ml-1">
-              Reading:
-            </span>
-            <select
-              value={readingFilter}
-              onChange={(e) => setReadingFilter(e.target.value)}
-              className="bg-white border border-[#121211]/12 rounded-full px-3 py-1 text-xs font-medium"
-            >
-              <option value="all">All Readings</option>
-              {READING_TYPES.map((rt) => (
-                <option key={rt} value={rt}>
-                  {rt}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={readingFilter}
+            onChange={(e) => setReadingFilter(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-medium"
+          >
+            <option value="all">All Readings</option>
+            {READING_TYPES.map((rt) => (
+              <option key={rt} value={rt}>
+                {rt}
+              </option>
+            ))}
+          </select>
         </div>
-
-        {importError && (
-          <div className="p-3.5 rounded-2xl bg-[#D9381E]/10 border border-[#D9381E]/25 text-xs text-[#D9381E]">
-            {importError}
-          </div>
-        )}
       </div>
 
-      {/* Invoices Editorial Table */}
-      <div className="ag-card rounded-[28px] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#EFECE6]/60 border-b border-[#121211]/10 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#575550]">
-                <th className="py-4 px-5">Invoice Ref &amp; Tax Date</th>
-                <th className="py-4 px-4">Site Name &amp; Provider</th>
-                <th className="py-4 px-4">Stream</th>
-                <th className="py-4 px-4 text-right">Usage</th>
-                <th className="py-4 px-4 text-right">GHG (tCO₂e)</th>
-                <th className="py-4 px-4 text-right">Net (£)</th>
-                <th className="py-4 px-4 text-right">VAT (£)</th>
-                <th className="py-4 px-4 text-right">Gross (£ GBP)</th>
-                <th className="py-4 px-4">Reading</th>
-                <th className="py-4 px-4">PDF Dossier</th>
-                <th className="py-4 px-5 text-right">Actions</th>
+      {importError && (
+        <div className="p-2.5 rounded bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
+          {importError}
+        </div>
+      )}
+
+      {/* High-Density Interactive Data Table */}
+      <div className="b2b-panel rounded overflow-hidden">
+        <div className="overflow-x-auto max-h-[68vh]">
+          <table className="w-full text-left border-collapse b2b-table">
+            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wider text-slate-500 sticky top-0 z-10">
+              <tr>
+                <th className="py-2.5 px-3">Invoice Ref</th>
+                <th className="py-2.5 px-2.5">Issue Date</th>
+                <th className="py-2.5 px-2.5">Billing Period</th>
+                <th className="py-2.5 px-3">Facility Name</th>
+                <th className="py-2.5 px-2.5">Supplier</th>
+                <th className="py-2.5 px-2.5">Stream &amp; Scope</th>
+                <th className="py-2.5 px-2.5 text-right">Metered Usage</th>
+                <th className="py-2.5 px-2.5 text-right">MT CO₂e</th>
+                <th className="py-2.5 px-2.5 text-right">Net (£)</th>
+                <th className="py-2.5 px-2.5 text-right">VAT (£)</th>
+                <th className="py-2.5 px-3 text-right">Gross (£ GBP)</th>
+                <th className="py-2.5 px-2.5">Reading</th>
+                <th className="py-2.5 px-2.5">PDF</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#121211]/[0.06] text-xs">
+            <tbody className="divide-y divide-slate-200 text-xs">
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={11}
-                    className="py-16 text-center text-[#8C8982] text-xs"
+                    colSpan={14}
+                    className="py-12 text-center text-slate-500 text-xs"
                   >
-                    <div className="font-editorial text-2xl text-[#121211]">
-                      No utility invoice records in the ledger
+                    <div className="font-semibold text-slate-800">
+                      No utility invoice records in current filter view
                     </div>
-                    <p className="text-[#8C8982] mt-1">
+                    <p className="text-slate-400 mt-0.5">
                       Log a utility invoice or import a verified CSV file to
                       populate the ledger.
                     </p>
-                    {isOwnerUnlocked ? (
-                      <button
-                        type="button"
-                        onClick={onAddInvoice}
-                        className="mt-4 px-5 py-2 rounded-full bg-[#121211] text-white font-medium hover:bg-[#D9381E] transition-colors"
-                      >
-                        + Log Utility Invoice
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={onRequestOwnerUnlock}
-                        className="mt-4 inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#121211] text-white font-medium hover:bg-[#D9381E] transition-colors"
-                      >
-                        <Lock className="w-3.5 h-3.5 text-[#D9381E]" />
-                        Owner Unlock to Add Data
-                      </button>
-                    )}
                   </td>
                 </tr>
               ) : (
@@ -442,131 +411,94 @@ export default function InvoiceTable({
                   const readingType = inv.readingType || 'Actual';
 
                   return (
-                    <tr
-                      key={inv.id}
-                      className="hover:bg-[#EFECE6]/40 transition-colors"
-                    >
-                      <td className="py-4 px-5">
-                        <div className="font-semibold text-[#121211]">
-                          {inv.invoiceNumber}
-                        </div>
-                        <div className="text-[11px] text-[#575550]">
-                          Issued: {inv.invoiceDate || inv.billingPeriodEnd}
-                        </div>
-                        <div className="text-[10px] text-[#8C8982]">
-                          {inv.billingPeriodStart} → {inv.billingPeriodEnd}
-                        </div>
+                    <tr key={inv.id}>
+                      <td className="py-2 px-3 font-mono-num font-semibold text-slate-900 whitespace-nowrap">
+                        {inv.invoiceNumber}
                       </td>
-
-                      <td className="py-4 px-4">
-                        <div className="font-medium text-[#121211]">
-                          {siteName}
-                        </div>
-                        <div className="text-[11px] text-[#8C8982]">
-                          {inv.supplier}
-                        </div>
+                      <td className="py-2 px-2.5 font-mono-num text-[11px] text-slate-600 whitespace-nowrap">
+                        {inv.invoiceDate || inv.billingPeriodEnd}
                       </td>
-
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
+                      <td className="py-2 px-2.5 font-mono-num text-[11px] text-slate-500 whitespace-nowrap">
+                        {inv.billingPeriodStart} → {inv.billingPeriodEnd}
+                      </td>
+                      <td className="py-2 px-3 font-medium text-slate-900 whitespace-nowrap">
+                        {siteName}
+                      </td>
+                      <td className="py-2 px-2.5 font-medium text-slate-700 whitespace-nowrap">
+                        {inv.supplier}
+                      </td>
+                      <td className="py-2 px-2.5 whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
                           {getCategoryIcon(inv.category)}
-                          <div>
-                            <div className="font-medium text-[#121211]">
-                              {catName}
-                            </div>
-                            <div className="text-[10px] uppercase tracking-wider text-[#8C8982]">
-                              {m.scope}
-                            </div>
-                          </div>
+                          <span className="font-medium text-slate-800">
+                            {catName}
+                          </span>
+                          <span className="font-mono-num text-[10px] px-1 rounded bg-slate-100 text-slate-600">
+                            {m.scope}
+                          </span>
                         </div>
                       </td>
-
-                      <td className="py-4 px-4 text-right tabular-nums">
-                        <div className="font-semibold text-[#121211]">
-                          {usageVal.toLocaleString('en-GB')} {inv.unit}
-                        </div>
-                        <div className="text-[10px] text-[#8C8982]">
-                          {inv.category !== 'water'
-                            ? `${(m.normalizedEnergyKwh / 1000).toFixed(2)} MWh`
-                            : `${m.normalizedWaterM3.toFixed(1)} m³`}
-                        </div>
+                      <td className="py-2 px-2.5 text-right font-mono-num font-semibold text-slate-900 whitespace-nowrap">
+                        {usageVal.toLocaleString('en-GB')} {inv.unit}
                       </td>
-
-                      <td className="py-4 px-4 text-right tabular-nums">
-                        <span className="font-semibold text-[#121211]">
-                          {m.co2eTonnes.toFixed(3)}
-                        </span>{' '}
-                        <span className="text-[10px] text-[#8C8982]">t</span>
+                      <td className="py-2 px-2.5 text-right font-mono-num font-semibold text-emerald-700 whitespace-nowrap">
+                        {m.co2eTonnes.toFixed(3)}
                       </td>
-
-                      <td className="py-4 px-4 text-right tabular-nums text-[#575550]">
+                      <td className="py-2 px-2.5 text-right font-mono-num text-slate-700 whitespace-nowrap">
                         £
                         {netVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </td>
-
-                      <td className="py-4 px-4 text-right tabular-nums">
-                        <div className="text-[#575550]">
-                          £
-                          {vatAmtVal.toLocaleString('en-GB', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </div>
-                        <div className="text-[10px] text-[#8C8982]">
-                          {vatRateVal}% VAT
-                        </div>
+                      <td className="py-2 px-2.5 text-right font-mono-num text-slate-500 whitespace-nowrap">
+                        £{vatAmtVal.toFixed(2)}{' '}
+                        <span className="text-[10px]">({vatRateVal}%)</span>
                       </td>
-
-                      <td className="py-4 px-4 text-right tabular-nums font-semibold text-[#121211]">
+                      <td className="py-2 px-3 text-right font-mono-num font-bold text-slate-900 whitespace-nowrap">
                         £
                         {grossVal.toLocaleString('en-GB', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
                       </td>
-
-                      <td className="py-4 px-4">
+                      <td className="py-2 px-2.5 whitespace-nowrap">
                         {readingType === 'Actual' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#1B4332]/10 text-[#1B4332]">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Actual
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono-num text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            ACTUAL
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#B45309]/10 text-[#B45309]">
-                            <Clock className="w-3 h-3" />
-                            Estimated
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono-num text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-2.5 h-2.5" />
+                            ESTIMATED
                           </span>
                         )}
                       </td>
-
-                      <td className="py-4 px-4">
+                      <td className="py-2 px-2.5 whitespace-nowrap">
                         {inv.pdfAttachment?.dataUrl ? (
                           <button
                             type="button"
                             onClick={() => setViewingPdfInvoice(inv)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-[#121211]/15 bg-white hover:bg-[#121211] hover:text-white text-[11px] font-medium text-[#121211] transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-mono-num text-[10px] font-semibold text-slate-800"
                             title={inv.pdfAttachment.name}
                           >
-                            <FileText className="w-3 h-3" />
-                            <span>View PDF</span>
+                            <FileText className="w-2.5 h-2.5 text-indigo-600" />
+                            PDF
                           </button>
                         ) : (
-                          <span className="text-[11px] text-[#8C8982]/50">
+                          <span className="font-mono-num text-[10px] text-slate-300">
                             —
                           </span>
                         )}
                       </td>
-
-                      <td className="py-4 px-5 text-right">
+                      <td className="py-2 px-3 text-right whitespace-nowrap">
                         {isOwnerUnlocked ? (
                           <div className="inline-flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => onEditInvoice(inv)}
-                              className="p-1.5 text-[#575550] hover:text-[#121211] hover:bg-[#EFECE6] rounded-full transition-colors"
+                              className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
                               title="Amend record"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -574,7 +506,7 @@ export default function InvoiceTable({
                             <button
                               type="button"
                               onClick={() => onDuplicateInvoice(inv)}
-                              className="p-1.5 text-[#575550] hover:text-[#121211] hover:bg-[#EFECE6] rounded-full transition-colors"
+                              className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
                               title="Duplicate invoice"
                             >
                               <Copy className="w-3.5 h-3.5" />
@@ -582,19 +514,16 @@ export default function InvoiceTable({
                             <button
                               type="button"
                               onClick={() => onDeleteInvoice(inv.id)}
-                              className="p-1.5 text-[#8C8982] hover:text-[#D9381E] hover:bg-[#D9381E]/10 rounded-full transition-colors"
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
                               title="Delete invoice"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <span
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EFECE6] text-[#8C8982] text-[10px] font-medium uppercase tracking-wider select-none"
-                            title="Edits are locked to repository owner (Mhutt97)"
-                          >
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-mono-num text-[10px] uppercase select-none">
                             <Lock className="w-2.5 h-2.5" />
-                            Locked
+                            LOCKED
                           </span>
                         )}
                       </td>
@@ -609,17 +538,17 @@ export default function InvoiceTable({
 
       {/* Stored PDF Document Viewer Modal */}
       {viewingPdfInvoice && viewingPdfInvoice.pdfAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#121211]/60 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-white rounded-[28px] border border-[#121211]/10 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 bg-[#121211] text-white flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="w-4 h-4 text-[#D9381E] shrink-0" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="bg-white rounded border border-slate-300 max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
                 <div className="truncate">
-                  <div className="text-xs font-semibold truncate">
+                  <div className="text-xs font-mono-num font-semibold truncate">
                     {viewingPdfInvoice.pdfAttachment.name}
                   </div>
-                  <div className="text-[10px] text-white/60">
-                    Invoice {viewingPdfInvoice.invoiceNumber} ·{' '}
+                  <div className="text-[10px] font-mono-num text-slate-400">
+                    {viewingPdfInvoice.invoiceNumber} ·{' '}
                     {viewingPdfInvoice.siteName} ·{' '}
                     {viewingPdfInvoice.supplier}
                   </div>
@@ -631,21 +560,21 @@ export default function InvoiceTable({
                     activePdfBlobUrl || viewingPdfInvoice.pdfAttachment.dataUrl
                   }
                   download={viewingPdfInvoice.pdfAttachment.name}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3 h-3" />
                   Download PDF
                 </a>
                 <button
                   type="button"
                   onClick={() => setViewingPdfInvoice(null)}
-                  className="p-1.5 text-white/60 hover:text-white rounded-full"
+                  className="p-1 text-slate-400 hover:text-white rounded"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-[#EFECE6]">
+            <div className="flex-1 bg-slate-100">
               {activePdfBlobUrl && (
                 <iframe
                   title={viewingPdfInvoice.pdfAttachment.name}

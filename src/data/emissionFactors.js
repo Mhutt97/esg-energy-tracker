@@ -12,6 +12,101 @@ export const SITES = [
   'Office Bristol',
 ];
 
+export const TENANT_ENTITIES = [
+  {
+    id: 'uk-holdings',
+    name: 'UK Commercial Holdings Ltd',
+    jurisdiction: 'UK · GBP (£)',
+    sites: SITES,
+  },
+  {
+    id: 'uk-north',
+    name: 'Northern Operations Division',
+    jurisdiction: 'Sheffield & Leeds · GBP (£)',
+    sites: ['Office Sheffield', 'Office Leeds'],
+  },
+  {
+    id: 'uk-south',
+    name: 'Southern & HQ Division',
+    jurisdiction: 'London & Bristol · GBP (£)',
+    sites: ['Head Office London', 'Office Bristol'],
+  },
+];
+
+export const REPORTING_FRAMEWORKS = {
+  CSRD: {
+    id: 'CSRD',
+    label: 'CSRD (ESRS E1)',
+    fullName: 'EU/UK Corporate Sustainability Reporting Directive — ESRS E1',
+    scope1Code: 'ESRS E1-6 §48 (Gross Scope 1 GHG)',
+    scope2Code: 'ESRS E1-6 §49 (Location-Based Scope 2 GHG)',
+    energyCode: 'ESRS E1-5 §37 (Total Energy Consumption MWh)',
+    waterCode: 'ESRS E3-4 §28 (Total Water Consumption m³)',
+    govCode: 'ESRS 2 GOV-1 / Audit Verification Rate',
+  },
+  GRI: {
+    id: 'GRI',
+    label: 'GRI 302 / 305',
+    fullName: 'Global Reporting Initiative — Energy (302) & Emissions (305)',
+    scope1Code: 'GRI 305-1 (Direct Scope 1 GHG Emissions)',
+    scope2Code: 'GRI 305-2 (Energy Indirect Scope 2 GHG)',
+    energyCode: 'GRI 302-1 (Energy Consumption Within Org)',
+    waterCode: 'GRI 303-5 (Water Consumption)',
+    govCode: 'GRI 2-5 (External Assurance & Meter Fidelity)',
+  },
+  SEC: {
+    id: 'SEC',
+    label: 'SEC Climate',
+    fullName: 'SEC Reg S-K Item 1504 — Climate-Related Disclosures',
+    scope1Code: 'Reg S-K §229.1504(a)(1) Scope 1',
+    scope2Code: 'Reg S-K §229.1504(a)(2) Scope 2',
+    energyCode: 'Operational Energy Intensity (kWh / MWh)',
+    waterCode: 'Resource Dependency — Water Withdrawal (m³)',
+    govCode: 'Item 1501 Attestation & Controls',
+  },
+  SECR: {
+    id: 'SECR',
+    label: 'UK SECR / DEFRA',
+    fullName: 'UK Streamlined Energy & Carbon Reporting (DESNZ / DEFRA 2026)',
+    scope1Code: 'UK SECR Direct Combustion (Natural Gas & Fuels)',
+    scope2Code: 'UK SECR Purchased Grid Electricity',
+    energyCode: 'UK SECR Aggregate kWh Equivalent',
+    waterCode: 'DEFRA Water Supply & Treatment Factors',
+    govCode: 'HMRC VAT (20% / 5% / 0%) & Actual Meter Audit',
+  },
+};
+
+export const SITE_BASELINE_TARGETS = {
+  'Head Office London': {
+    monthlyKwhTarget: 18000,
+    monthlyCo2eTarget: 3.6,
+    monthlyGrossTarget: 4500,
+    headcountFte: 145,
+    floorAreaM2: 3200,
+  },
+  'Office Sheffield': {
+    monthlyKwhTarget: 9500,
+    monthlyCo2eTarget: 1.9,
+    monthlyGrossTarget: 2200,
+    headcountFte: 68,
+    floorAreaM2: 1550,
+  },
+  'Office Leeds': {
+    monthlyKwhTarget: 11000,
+    monthlyCo2eTarget: 2.2,
+    monthlyGrossTarget: 2600,
+    headcountFte: 82,
+    floorAreaM2: 1850,
+  },
+  'Office Bristol': {
+    monthlyKwhTarget: 8500,
+    monthlyCo2eTarget: 1.7,
+    monthlyGrossTarget: 1950,
+    headcountFte: 55,
+    floorAreaM2: 1300,
+  },
+};
+
 export const READING_TYPES = ['Actual', 'Estimated'];
 
 export const VAT_RATES = [
