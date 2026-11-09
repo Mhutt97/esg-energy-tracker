@@ -61,6 +61,10 @@ export default function App() {
   // Enterprise Layout & Contextual Command Bar State
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [dashboardSubView, setDashboardSubView] = useState('overview'); // 'overview' | 'completeness' | 'decarbonization' | 'disclosures'
+  const [scope2AccountingMethod, setScope2AccountingMethod] =
+    useState('location'); // 'location' | 'market'
+  const [themeMode, setThemeMode] = useState('light'); // 'light' | 'dark'
   const [selectedTenantId, setSelectedTenantId] = useState(
     TENANT_ENTITIES[0].id
   );
@@ -69,6 +73,10 @@ export default function App() {
   const [selectedSite, setSelectedSite] = useState('All Sites');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [globalSearch, setGlobalSearch] = useState('');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeMode);
+  }, [themeMode]);
 
   // KPI Audit Drill-Down Drawer State
   const [drilldownKpi, setDrilldownKpi] = useState(null);
@@ -465,33 +473,65 @@ export default function App() {
             </button>
           </div>
 
-          {/* Primary Views Navigation */}
+          {/* Primary Views Navigation (Watershed / Persefoni / Sweep Modules) */}
           <div className="p-2 space-y-0.5 border-b border-slate-800">
             {!sidebarCollapsed && (
               <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Platform Modules
+                ESG Platform Modules
               </div>
             )}
             {[
               {
-                id: 'dashboard',
-                label: 'Telemetry & Matrix',
+                id: 'overview',
+                tab: 'dashboard',
+                subView: 'overview',
+                label: 'Overview & Telemetry',
                 icon: LayoutDashboard,
               },
               {
+                id: 'completeness',
+                tab: 'dashboard',
+                subView: 'completeness',
+                label: 'Completeness & Quality',
+                icon: CheckCircle2,
+              },
+              {
+                id: 'decarbonization',
+                tab: 'dashboard',
+                subView: 'decarbonization',
+                label: 'SBTi & Decarbonization',
+                icon: Layers,
+              },
+              {
+                id: 'disclosures',
+                tab: 'dashboard',
+                subView: 'disclosures',
+                label: 'Disclosures & Factors',
+                icon: FileText,
+              },
+              {
                 id: 'invoices',
+                tab: 'invoices',
+                subView: null,
                 label: 'Utility Invoice Ledger',
                 icon: Receipt,
                 badge: contextFilteredInvoices.length,
               },
             ].map((item) => {
               const Icon = item.icon;
-              const active = activeTab === item.id;
+              const active =
+                item.tab === 'invoices'
+                  ? activeTab === 'invoices'
+                  : activeTab === 'dashboard' &&
+                    dashboardSubView === item.subView;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.tab);
+                    if (item.subView) setDashboardSubView(item.subView);
+                  }}
                   title={item.label}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded text-xs font-medium transition-colors ${
                     active
@@ -739,10 +779,50 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            {/* Scope 2 Dual Accounting Method Toggle (Location vs Market) */}
+            <div
+              className="hidden lg:flex items-center bg-slate-100 p-0.5 rounded border border-slate-200 text-[11px]"
+              title="GHG Protocol Dual Scope 2 Accounting: Location-Based (UK Grid 0.207) vs Market-Based (Supplier REGO Fuel Mix)"
+            >
+              {[
+                { id: 'location', label: 'S2: Location' },
+                { id: 'market', label: 'S2: Market (REGO)' },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setScope2AccountingMethod(m.id)}
+                  className={`px-2 py-0.5 rounded-xs font-mono-num text-[10px] font-semibold transition-colors ${
+                    scope2AccountingMethod === m.id
+                      ? 'bg-emerald-700 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Right: Quick Search + Export Audit (CSV/XBRL) + Log Invoice */}
+          {/* Right: Quick Search + Theme Toggle + Export Audit (CSV/XBRL) + Log Invoice */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Terminal Surface Theme Toggle (Slate Light / Carbon Dark) */}
+            <button
+              type="button"
+              onClick={() =>
+                setThemeMode((prev) => (prev === 'light' ? 'dark' : 'light'))
+              }
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-slate-50 text-[10px] font-mono-num font-semibold text-slate-700 hover:bg-slate-100"
+              title="Switch between Slate Light (Watershed/Persefoni) and Carbon Dark (Bloomberg/Linear) surface theme"
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  themeMode === 'dark' ? 'bg-emerald-400' : 'bg-slate-900'
+                }`}
+              />
+              <span>{themeMode === 'dark' ? 'CARBON' : 'SLATE'}</span>
+            </button>
             {/* Quick Search Input */}
             <div className="relative w-44 sm:w-56">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -871,6 +951,10 @@ export default function App() {
               selectedFramework={currentFrameworkObj}
               selectedScopeFilter={selectedScopeFilter}
               onSelectScopeFilter={setSelectedScopeFilter}
+              dashboardSubView={dashboardSubView}
+              onSelectDashboardSubView={setDashboardSubView}
+              scope2AccountingMethod={scope2AccountingMethod}
+              onChangeScope2Method={setScope2AccountingMethod}
               onOpenNewInvoice={() => {
                 if (!isOwnerUnlocked) {
                   handleRequestOwnerUnlock();

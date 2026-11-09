@@ -5,6 +5,155 @@
 
 export const SUPPLIERS = ['EDF', 'SSE', 'EON', 'Octopus'];
 
+/**
+ * UK Supplier-Specific Market-Based Scope 2 Factors (Ofgem Fuel Mix Disclosure & REGO Tariffs)
+ * Used for dual GHG Protocol Scope 2 reporting (Location-Based vs. Market-Based)
+ */
+export const SUPPLIER_MARKET_FACTORS = {
+  Octopus: {
+    supplier: 'Octopus',
+    marketKgCo2ePerKwh: 0.0,
+    regoSharePct: 100,
+    instrument: '100% REGO-Backed Renewable Tariff',
+    fuelMixNote: 'Solar, Offshore Wind & Hydro (Ofgem Verified REGOs)',
+  },
+  EDF: {
+    supplier: 'EDF',
+    marketKgCo2ePerKwh: 0.038,
+    regoSharePct: 82,
+    instrument: 'Zero-Carbon Nuclear & REGO Backing',
+    fuelMixNote: 'UK Nuclear Fleet + Renewable Guarantees of Origin',
+  },
+  EON: {
+    supplier: 'EON',
+    marketKgCo2ePerKwh: 0.095,
+    regoSharePct: 54,
+    instrument: 'E.ON Next Commercial Mixed REGO Tariff',
+    fuelMixNote: '54% Renewable REGOs / 46% UK Grid Residual Mix',
+  },
+  SSE: {
+    supplier: 'SSE',
+    marketKgCo2ePerKwh: 0.112,
+    regoSharePct: 46,
+    instrument: 'SSE Hydro/Wind Commercial Supply',
+    fuelMixNote: 'Scottish Hydro & Wind REGOs + Grid Residual',
+  },
+};
+
+export const DEFRA_FACTOR_REGISTRY = [
+  {
+    id: 'EF-UK-ELEC-LOC',
+    category: 'Electricity',
+    scope: 'Scope 2 (Location)',
+    activityUnit: 'kWh',
+    factorValue: 0.207,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.20496',
+    ch4Share: '0.00089',
+    n2oShare: '0.00115',
+    source: 'UK DESNZ / DEFRA 2025/2026',
+    methodology: 'UK National Grid Generation Average (Location-Based)',
+  },
+  {
+    id: 'EF-UK-ELEC-MKT-OCT',
+    category: 'Electricity (Octopus)',
+    scope: 'Scope 2 (Market)',
+    activityUnit: 'kWh',
+    factorValue: 0.0,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.00000',
+    ch4Share: '0.00000',
+    n2oShare: '0.00000',
+    source: 'Ofgem FMD / REGO Registry',
+    methodology: '100% REGO-Backed Renewable Electricity Contract',
+  },
+  {
+    id: 'EF-UK-ELEC-MKT-EDF',
+    category: 'Electricity (EDF)',
+    scope: 'Scope 2 (Market)',
+    activityUnit: 'kWh',
+    factorValue: 0.038,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.03760',
+    ch4Share: '0.00018',
+    n2oShare: '0.00022',
+    source: 'Ofgem FMD / EDF Business',
+    methodology: 'Zero-Carbon Nuclear & REGO Backed Commercial Supply',
+  },
+  {
+    id: 'EF-UK-ELEC-MKT-EON',
+    category: 'Electricity (EON)',
+    scope: 'Scope 2 (Market)',
+    activityUnit: 'kWh',
+    factorValue: 0.095,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.09410',
+    ch4Share: '0.00040',
+    n2oShare: '0.00050',
+    source: 'Ofgem FMD / E.ON Next',
+    methodology: 'Commercial REGO Mix + Residual Grid Allocation',
+  },
+  {
+    id: 'EF-UK-ELEC-MKT-SSE',
+    category: 'Electricity (SSE)',
+    scope: 'Scope 2 (Market)',
+    activityUnit: 'kWh',
+    factorValue: 0.112,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.11090',
+    ch4Share: '0.00048',
+    n2oShare: '0.00062',
+    source: 'Ofgem FMD / SSE Energy',
+    methodology: 'Hydro/Wind REGO Portfolio + Residual Grid Allocation',
+  },
+  {
+    id: 'EF-UK-GAS-KWH',
+    category: 'Natural Gas',
+    scope: 'Scope 1 (Direct)',
+    activityUnit: 'kWh',
+    factorValue: 0.1829,
+    factorUnit: 'kg CO₂e / kWh',
+    co2Share: '0.18254',
+    ch4Share: '0.00026',
+    n2oShare: '0.00010',
+    source: 'UK DESNZ / DEFRA 2025/2026',
+    methodology: 'Pipeline Natural Gas Gross Calorific Value (100% Mineral)',
+  },
+  {
+    id: 'EF-UK-GAS-M3',
+    category: 'Natural Gas (Volume)',
+    scope: 'Scope 1 (Direct)',
+    activityUnit: 'm³',
+    factorValue: 2.046,
+    factorUnit: 'kg CO₂e / m³',
+    co2Share: '2.04190',
+    ch4Share: '0.00290',
+    n2oShare: '0.00120',
+    source: 'UK DESNZ / DEFRA 2025/2026',
+    methodology: 'Volumetric Gas Conversion (11.1868 kWh / m³)',
+  },
+  {
+    id: 'EF-UK-WATER-M3',
+    category: 'Water & Wastewater',
+    scope: 'Scope 3 (Water)',
+    activityUnit: 'm³',
+    factorValue: 0.149,
+    factorUnit: 'kg CO₂e / m³',
+    co2Share: '0.14780',
+    ch4Share: '0.00065',
+    n2oShare: '0.00055',
+    source: 'UK DESNZ / DEFRA 2025/2026',
+    methodology: 'UK Potable Water Supply + Mains Wastewater Treatment',
+  },
+];
+
+export const SBTI_PATHWAY_CONFIG = {
+  baseYear: 2022,
+  targetYear: 2030,
+  annualLinearReductionPct: 4.2, // SBTi 1.5°C Corporate Net-Zero linear rate (4.2% p.a.)
+  baseYearAnnualTonnesCo2e: 138.0, // Portfolio 4-site 2022 verified baseline
+};
+
 export const SITES = [
   'Head Office London',
   'Office Sheffield',
@@ -367,12 +516,23 @@ export function calculateInvoiceEsgMetrics(invoice) {
     const factor = UTILITY_CATEGORIES.electricity.kgCo2ePerKwh;
     const co2eTonnes = (normalizedEnergyKwh * factor) / 1000;
 
+    const supplierKey = normalizeSupplierName(invoice?.supplier);
+    const marketMeta =
+      SUPPLIER_MARKET_FACTORS[supplierKey] || SUPPLIER_MARKET_FACTORS.EDF;
+    const marketCo2eTonnes =
+      (normalizedEnergyKwh * marketMeta.marketKgCo2ePerKwh) / 1000;
+
     return {
       scope: 'Scope 2',
       normalizedEnergyKwh,
       normalizedWaterM3: 0,
       co2eTonnes,
-      effectiveFactorLabel: `${factor.toFixed(3)} kgCO₂e/kWh (UK DEFRA)`,
+      locationCo2eTonnes: co2eTonnes,
+      marketCo2eTonnes,
+      marketFactorKgPerKwh: marketMeta.marketKgCo2ePerKwh,
+      regoSharePct: marketMeta.regoSharePct,
+      marketInstrument: marketMeta.instrument,
+      effectiveFactorLabel: `${factor.toFixed(3)} kgCO₂e/kWh (Loc) · ${marketMeta.marketKgCo2ePerKwh.toFixed(3)} kgCO₂e/kWh (Mkt)`,
     };
   }
 
@@ -398,6 +558,11 @@ export function calculateInvoiceEsgMetrics(invoice) {
       normalizedEnergyKwh,
       normalizedWaterM3: 0,
       co2eTonnes,
+      locationCo2eTonnes: co2eTonnes,
+      marketCo2eTonnes: co2eTonnes,
+      marketFactorKgPerKwh: UTILITY_CATEGORIES.natural_gas.kgCo2ePerKwh,
+      regoSharePct: 0,
+      marketInstrument: 'Direct Stationary Combustion (Scope 1)',
       effectiveFactorLabel: `${UTILITY_CATEGORIES.natural_gas.kgCo2ePerKwh.toFixed(
         4
       )} kgCO₂e/kWh (UK DEFRA)`,
@@ -416,6 +581,11 @@ export function calculateInvoiceEsgMetrics(invoice) {
     normalizedEnergyKwh: 0,
     normalizedWaterM3,
     co2eTonnes,
+    locationCo2eTonnes: co2eTonnes,
+    marketCo2eTonnes: co2eTonnes,
+    marketFactorKgPerKwh: factorPerM3,
+    regoSharePct: 0,
+    marketInstrument: 'Municipal Water & Treatment (Scope 3)',
     effectiveFactorLabel: `${factorPerM3.toFixed(3)} kgCO₂e/m³ (UK DEFRA)`,
   };
 }
